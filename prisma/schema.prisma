@@ -12,3 +12,66 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+// تحديد حالات الموعد
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+// نموذج المستخدم العام (للطلبة، الموظفين، والأطباء)
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String
+  role          Role      @default(PATIENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // علاقات
+  patientAppointments Appointment[] @relation("PatientAppointments")
+  doctorProfile      Doctor?       // إذا كان المستخدم طبيباً، سيكون له ملف تعريف طبيب
+}
+
+model Doctor {
+  id           String        @id @default(cuid())
+  specialty    String        // التخصص (مثلاً: جلدية، عام، أسنان)
+  bio          String?
+  available    Boolean       @default(true)
+  
+  // ربط الطبيب بحساب مستخدم
+  userId       String        @unique
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // علاقات
+  appointments Appointment[]
+}
+
+// نموذج المواعيد
+model Appointment {
+  id          String            @id @default(cuid())
+  dateTime    DateTime          // تاريخ ووقت الموعد
+  status      AppointmentStatus @default(PENDING)
+  reason      String?           // سبب الزيارة
+  notes       String?           // ملاحظات الطبيب بعد الكشف
+
+  // العلاقة مع المريض (المستخدم)
+  patientId   String
+  patient     User              @relation("PatientAppointments", fields: [patientId], references: [id])
+
+  // العلاقة مع الطبيب
+  doctorId    String
+  doctor      Doctor            @relation(fields: [doctorId], references: [id])
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
