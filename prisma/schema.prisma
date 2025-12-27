@@ -39,18 +39,18 @@ model User {
 
   // علاقات
   patientAppointments Appointment[] @relation("PatientAppointments")
-  doctorProfile      Doctor?       // إذا كان المستخدم طبيباً، سيكون له ملف تعريف طبيب
+  doctorProfile      Doctor?       
 }
 
 model Doctor {
   id           String        @id @default(cuid())
-  specialty    String        // التخصص (مثلاً: جلدية، عام، أسنان)
+  specialty    String        
   bio          String?
   available    Boolean       @default(true)
   
   // ربط الطبيب بحساب مستخدم
   userId       String        @unique
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // علاقات
   appointments Appointment[]
