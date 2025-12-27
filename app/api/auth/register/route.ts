@@ -5,5 +5,5 @@ import { hashPassword } from "../../../../lib/hash"
 export async function POST(req: Request) {
     const {name , email , password } = await req.json();
 
-    const exists = await prisma.user
+    const exists
 }
