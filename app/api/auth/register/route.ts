@@ -1,30 +1,28 @@
-import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma"
-import { hashPassword } from "../../../../lib/hash"
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import bcrypt from 'bcrypt';
 
 export async function POST(req: Request) {
     const { name, email, password } = await req.json();
-    const exists = await prisma.user.findUnique({
+
+    const isExist = await prisma.user.findUnique({
         where: { email }
     })
 
-    if (exists) {
-        return NextResponse.json(
-            { message: "email is already exist" },
-            { status: 400 }
-        )
+    if (isExist) {
+        return NextResponse.json({ message: "this email is already in use, try another email" })
     }
 
-    const hashed = await hashPassword(password);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
         data: {
             name,
             email,
-            password: hashed
-        }
-    })
+            password: hashedPassword,
+            role: 'PATIENT',
+        },
+    });
 
-    return NextResponse.json(user , {status: 201});
+    return NextResponse.json({ user });
 }
-
