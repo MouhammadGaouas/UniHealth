@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
+import { Payload } from '@prisma/client/runtime/client';
 
 export function getAuthUser(req: NextRequest) {
   const token = req.cookies.get('token')?.value;
@@ -15,11 +16,16 @@ export function getAuthUser(req: NextRequest) {
   }
 }
 
+
+
+
 export function requireRole(
   user: { role: string } | null,
   role: 'PATIENT' | 'DOCTOR' | 'ADMIN'
 ) {
+
   if (!user || user.role !== role) {
     throw new Error('Forbidden');
   }
+
 }

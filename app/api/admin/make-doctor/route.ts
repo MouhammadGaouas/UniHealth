@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
 
   const { userId, specialty } = await req.json();
 
+  console.log(userId , specialty)
+
   await prisma.user.update({
     where: { id: userId },
     data: { role: 'DOCTOR' },
