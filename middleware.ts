@@ -10,7 +10,6 @@ export function middleware(req: NextRequest) {
   try {
     const user = jwt.verify(token, process.env.JWT_SECRET!) as { role: string };
 
-    // حماية صفحة الأدمن
     if (req.nextUrl.pathname.startsWith('/dashboard/admin') && user.role !== 'ADMIN') {
       return NextResponse.redirect(new URL('/unauthorized', req.url));
     }

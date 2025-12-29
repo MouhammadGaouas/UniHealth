@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
   const { userId, specialty } = await req.json();
 
-  console.log(userId , specialty)
+  console.log(userId, specialty)
 
   await prisma.user.update({
     where: { id: userId },
@@ -29,3 +29,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ message: 'User promoted to Doctor' });
 }
+
