@@ -27,7 +27,6 @@ enum AppointmentStatus {
   COMPLETED
 }
 
-// نموذج المستخدم العام (للطلبة، الموظفين، والأطباء)
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -37,7 +36,6 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // علاقات
   patientAppointments Appointment[] @relation("PatientAppointments")
   doctorProfile      Doctor?       
 }
@@ -48,27 +46,24 @@ model Doctor {
   bio          String?
   available    Boolean       @default(true)
   
-  // ربط الطبيب بحساب مستخدم
   userId       String        @unique
     user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // علاقات
   appointments Appointment[]
 }
 
-// نموذج المواعيد
 model Appointment {
   id          String            @id @default(cuid())
-  dateTime    DateTime          // تاريخ ووقت الموعد
+  dateTime    DateTime         
   status      AppointmentStatus @default(PENDING)
-  reason      String?           // سبب الزيارة
-  notes       String?           // ملاحظات الطبيب بعد الكشف
+  reason      String?         
+  notes       String?          
 
-  // العلاقة مع المريض (المستخدم)
+
   patientId   String
   patient     User              @relation("PatientAppointments", fields: [patientId], references: [id])
 
-  // العلاقة مع الطبيب
+
   doctorId    String
   doctor      Doctor            @relation(fields: [doctorId], references: [id])
 
