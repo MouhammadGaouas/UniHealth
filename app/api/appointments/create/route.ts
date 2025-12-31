@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  console.log(doctorId , dateTime , reason)
+
   const doctor = await prisma.doctor.findUnique({
     where: { id: doctorId }
   })
@@ -35,6 +37,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
+
   const appointment = await prisma.appointment.create({
     data: {
       dateTime: new Date(dateTime),
@@ -43,6 +46,8 @@ export async function POST(req: NextRequest) {
       doctorId
     }
   })
+
+
 
   return NextResponse.json(
     { message: "Appointment created successfully", appointment },
