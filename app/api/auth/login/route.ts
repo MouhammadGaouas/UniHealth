@@ -4,46 +4,47 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 export async function POST(req: Request) {
-    const { email, password } = await req.json();
+    try {
+        const { email, password } = await req.json();
 
-    const user = await prisma.user.findUnique(
-        { where: { email } }
-    );
-    if (!user) {
-        return NextResponse.json(
-            { message: 'Invalid credentials' },
-            { status: 401 }
+        if (!email || !password) {
+            return NextResponse.json({ message: "Missing email or password" }, { status: 400 });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { email }
+        });
+
+        if (!user) {
+            return NextResponse.json({ message: "Invalid credentials" }, { status: 401 });
+        }
+
+        const passwordMatch = await bcrypt.compare(password, user.password);
+
+        if (!passwordMatch) {
+            return NextResponse.json({ message: "Invalid credentials" }, { status: 401 });
+        }
+
+        const token = jwt.sign(
+            { id: user.id, role: user.role, email: user.email, name: user.name },
+            process.env.JWT_SECRET!,
+            { expiresIn: '1d' }
         );
+
+        const response = NextResponse.json({ message: "Login successful" }, { status: 200 });
+
+        response.cookies.set('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 86400, // 1 day
+            path: '/',
+        });
+
+        return response;
+
+    } catch (error) {
+        console.error("Login error:", error);
+        return NextResponse.json({ message: "Internal server error" }, { status: 500 });
     }
-
-    const valid = await bcrypt.compare(password, user.password);
-
-
-    if (!valid) {
-        return NextResponse.json(
-            { message: 'Invalid credentials' },
-            { status: 401 }
-        );
-    }
-
-    const token = jwt.sign(
-        { id: user.id, role: user.role },
-        process.env.JWT_SECRET!,
-        { expiresIn: '7d' }
-    );
-
-    const res = NextResponse.json({ message: 'Logged in' });
-
-
-    res.cookies.set({
-        name: 'token',
-        value: token,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/',
-        maxAge: 60 * 60 * 24 * 7,
-    });
-
-    return res;
 }
