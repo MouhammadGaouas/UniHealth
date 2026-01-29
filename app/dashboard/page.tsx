@@ -21,11 +21,16 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+
   useEffect(() => {
     // Check if user is logged in (basic client-side check via API)
     // In a real app, middleware would handle protection better
+
     fetchAppointments();
   }, []);
+
+
+
 
   const fetchAppointments = async () => {
     try {

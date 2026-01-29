@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({ appointments }, { status: 200 });
     } catch (error) {
+        console.error("Error fetching appointments:", error);
         return NextResponse.json({ message: "Error fetching appointments" }, { status: 500 });
     }
 }

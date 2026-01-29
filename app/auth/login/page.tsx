@@ -25,8 +25,31 @@ export default function LoginPage() {
             });
 
             if (res.ok) {
-                router.refresh();
-                router.push("/");
+                // Login succeeded, token cookie is now set.
+                // Fetch the authenticated user to determine their role
+                try {
+                    const meRes = await fetch("/api/auth/me", {
+                        method: "GET",
+                        cache: "no-store",
+                    });
+
+                    if (meRes.ok) {
+                        const me = await meRes.json();
+
+                        if (me.role === "DOCTOR") {
+                            router.push("/dashboard/doctor");
+                        } else if (me.role === "ADMIN") {
+                            router.push("/dashboard/admin");
+                        } else {
+                            router.push("/dashboard");
+                        }
+                    } else {
+                        // Fallback if /api/auth/me fails for some reason
+                        router.push("/dashboard");
+                    }
+                } finally {
+                    router.refresh();
+                }
             } else {
                 const data = await res.json();
                 setError(data.message || "Login failed");

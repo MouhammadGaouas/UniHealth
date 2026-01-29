@@ -15,6 +15,7 @@ export async function GET() {
         });
         return NextResponse.json({ doctors }, { status: 200 });
     } catch (error) {
+        console.error("Error fetching doctors:", error);
         return NextResponse.json({ message: "Error fetching doctors" }, { status: 500 });
     }
 }

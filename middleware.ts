@@ -5,13 +5,14 @@ function decodeToken(token: string) {
   try {
     const payload = token.split('.')[1];
     const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(decoded);
+    return JSON.parse(decoded) as { id: string; role: string; email?: string; name?: string };
   } catch {
     return null;
   }
 }
 
 export function middleware(req: NextRequest) {
+  // Only protect dashboard routes
   const token = req.cookies.get('token')?.value;
 
   if (!token) {
@@ -24,7 +25,15 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login', req.url));
   }
 
-  if (req.nextUrl.pathname.startsWith('/dashboard/admin') && user.role !== 'ADMIN') {
+  const path = req.nextUrl.pathname;
+
+  // Check admin dashboard routes
+  if (path.startsWith('/dashboard/admin') && user.role !== 'ADMIN') {
+    return NextResponse.redirect(new URL('/unauthorized', req.url));
+  }
+
+  // Check doctor dashboard routes
+  if (path.startsWith('/dashboard/doctor') && user.role !== 'DOCTOR') {
     return NextResponse.redirect(new URL('/unauthorized', req.url));
   }
 
@@ -32,5 +41,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard', '/dashboard/:path*'],
+  matcher: ['/dashboard/:path*'],
 };

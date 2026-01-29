@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { Payload } from '@prisma/client/runtime/client';
+
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is not set');
+}
 
 export function getAuthUser(req: NextRequest) {
   const token = req.cookies.get('token')?.value;
@@ -10,6 +13,8 @@ export function getAuthUser(req: NextRequest) {
     return jwt.verify(token, process.env.JWT_SECRET!) as {
       id: string;
       role: 'PATIENT' | 'DOCTOR' | 'ADMIN';
+      email?: string;
+      name?: string;
     };
   } catch {
     return null;

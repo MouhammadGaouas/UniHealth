@@ -19,7 +19,6 @@ enum Role {
   ADMIN
 }
 
-// تحديد حالات الموعد
 enum AppointmentStatus {
   PENDING
   CONFIRMED

@@ -5,6 +5,10 @@ import jwt from 'jsonwebtoken';
 
 export async function POST(req: Request) {
     try {
+        if (!process.env.JWT_SECRET) {
+            return NextResponse.json({ message: "Server configuration error" }, { status: 500 });
+        }
+
         const { email, password } = await req.json();
 
         if (!email || !password) {
@@ -27,7 +31,7 @@ export async function POST(req: Request) {
 
         const token = jwt.sign(
             { id: user.id, role: user.role, email: user.email, name: user.name },
-            process.env.JWT_SECRET!,
+            process.env.JWT_SECRET,
             { expiresIn: '1d' }
         );
 
