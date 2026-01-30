@@ -44,19 +44,36 @@ model Doctor {
   specialty    String        
   bio          String?
   available    Boolean       @default(true)
+  startTime    String        @default("09:00")
+  endTime      String        @default("17:00")
   
   userId       String        @unique
     user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  appointments Appointment[]
+  appointmentTypes AppointmentType[]
+}
+
+model AppointmentType {
+  id        String   @id @default(cuid())
+  name      String
+  duration  Int      // in minutes
+  price     Float?
+  doctorId  String
+  doctor    Doctor   @relation(fields: [doctorId], references: [id])
   appointments Appointment[]
 }
 
 model Appointment {
   id          String            @id @default(cuid())
   dateTime    DateTime         
+  endTime     DateTime?        // Make optional initially to avoid migration issues with existing data, but ideally required
   status      AppointmentStatus @default(PENDING)
   reason      String?         
   notes       String?          
+  
+  appointmentTypeId String?
+  appointmentType AppointmentType? @relation(fields: [appointmentTypeId], references: [id])
 
 
   patientId   String

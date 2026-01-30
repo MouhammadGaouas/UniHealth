@@ -19,18 +19,73 @@ interface Appointment {
 export default function DashboardPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("17:00");
+  const [savingSettings, setSavingSettings] = useState(false);
   const router = useRouter();
 
 
   useEffect(() => {
-    // Check if user is logged in (basic client-side check via API)
-    // In a real app, middleware would handle protection better
-
+    fetchUser();
     fetchAppointments();
   }, []);
 
 
 
+
+  const fetchUser = async () => {
+    try {
+      const res = await fetch("/api/auth/me");
+      if (res.status === 401) {
+        router.push("/auth/login");
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+        if (data.role === "DOCTOR") {
+          fetchDoctorSettings();
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch user", error);
+    }
+  };
+
+  const fetchDoctorSettings = async () => {
+    try {
+      const res = await fetch("/api/doctor/settings");
+      if (res.ok) {
+        const data = await res.json();
+        setStartTime(data.startTime);
+        setEndTime(data.endTime);
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings", error);
+    }
+  };
+
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const res = await fetch("/api/doctor/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startTime, endTime })
+      });
+      if (res.ok) {
+        alert("Settings saved successfully!");
+      } else {
+        alert("Failed to save settings");
+      }
+    } catch (error) {
+      console.error("Failed to save settings", error);
+      alert("Failed to save settings");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const fetchAppointments = async () => {
     try {
@@ -75,6 +130,43 @@ export default function DashboardPage() {
             </button>
           </Link>
         </div>
+
+        {/* Doctor Settings Section */}
+        {user?.role === "DOCTOR" && (
+          <div className="glass border border-gray-800 rounded-2xl p-8 shadow-xl mb-8 animate-[slideUp_0.6s_ease-out]">
+            <h2 className="text-2xl font-bold text-white mb-6 border-b border-gray-800 pb-4">Availability Settings</h2>
+            <p className="text-gray-400 mb-6">Set your working hours. Patients will only see available slots within these times.</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-300 mb-2">Start Time</label>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="block w-full rounded-xl border-gray-700 bg-gray-800 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-300 mb-2">End Time</label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="block w-full rounded-xl border-gray-700 bg-gray-800 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm transition-all"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={saveSettings}
+              disabled={savingSettings}
+              className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/30"
+            >
+              {savingSettings ? "Saving..." : "Save Settings"}
+            </button>
+          </div>
+        )}
 
         <div className="glass border border-gray-800 rounded-2xl p-8 shadow-xl animate-[slideUp_0.6s_ease-out]">
           <h2 className="text-2xl font-bold text-white mb-8 border-b border-gray-800 pb-4">Upcoming Appointments</h2>
