@@ -1,42 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏥 UniHealth
 
-## Getting Started
+A modern healthcare appointment management system built with Next.js, designed for university health services.
 
-First, run the development server:
+## ✨ Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Multi-role system**: Patient, Doctor, and Admin dashboards
+- **Appointment booking**: Browse doctors, select time slots, book appointments
+- **Doctor availability**: Doctors can set their working hours
+- **Admin management**: User management, analytics, and doctor promotion
+- **Secure authentication**: JWT-based auth with protected routes
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** 18+ 
+- **PostgreSQL** database
+- **npm** or **yarn**
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/UniHealth.git
+   cd UniHealth
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**
+   
+   Create a `.env` file in the root directory:
+   ```env
+   DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+   JWT_SECRET="your-secret-key-here"
+   ```
+
+4. **Set up the database**
+   ```bash
+   # Generate Prisma client
+   npx prisma generate
+   
+   # Run migrations
+   npx prisma migrate dev
+   
+   # Seed the database with sample data
+   npx tsx prisma/seed.ts
+   ```
+
+5. **Start the development server**
+   ```bash
+   npm run dev
+   ```
+
+6. **Open** [http://localhost:3000](http://localhost:3000) in your browser
+
+---
+
+## 📁 Project Structure
+
+```
+UniHealth/
+├── app/                    # Next.js App Router
+│   ├── api/               # API routes
+│   │   ├── admin/         # Admin endpoints
+│   │   ├── appointments/  # Appointment CRUD
+│   │   ├── auth/          # Authentication
+│   │   └── doctors/       # Doctor endpoints
+│   ├── auth/              # Auth pages (login/register)
+│   ├── book/              # Booking wizard
+│   └── dashboard/         # Role-based dashboards
+│       ├── admin/         # Admin dashboard
+│       └── doctor/        # Doctor dashboard
+├── components/            # Reusable React components
+├── lib/                   # Utility functions
+│   ├── auth.ts           # Auth helpers
+│   └── prisma.ts         # Database client
+├── prisma/               
+│   ├── schema.prisma     # Database schema
+│   └── seed.ts           # Seed data
+└── middleware.ts         # Route protection
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🛠️ Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Category | Technology |
+|----------|------------|
+| Framework | Next.js 16 |
+| Language | TypeScript |
+| Database | PostgreSQL + Prisma ORM |
+| Styling | Tailwind CSS |
+| Auth | JWT (jsonwebtoken + jose) |
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 👥 Default Users (after seeding)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Role | Email | Password |
+|------|-------|----------|
+| Doctor | dr.smith@unihealth.com | password123 |
+| Doctor | dr.jones@unihealth.com | password123 |
+| Doctor | dr.lee@unihealth.com | password123 |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+> Register a new account to test as a patient, or modify `seed.ts` to add an admin user.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📜 Available Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# UniHealth
-# UniHealth
-# UniHealth
-# UniHealth
-# UniHealth
-# UniHealth
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npx prisma studio` | Open Prisma database GUI |
+
+---
+
+## 📄 License
+
+MIT License

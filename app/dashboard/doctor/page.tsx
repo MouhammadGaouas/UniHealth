@@ -10,6 +10,7 @@ import {
   FaClock,
   FaCheckCircle,
   FaExclamationCircle,
+  FaCog,
 } from "react-icons/fa";
 
 interface DoctorAppointment {
@@ -29,6 +30,10 @@ export default function DoctorDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("17:00");
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -62,27 +67,47 @@ export default function DoctorDashboardPage() {
       }
     };
 
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/doctor/settings");
+        if (res.ok) {
+          const data = await res.json();
+          setStartTime(data.startTime || "09:00");
+          setEndTime(data.endTime || "17:00");
+        }
+      } catch (err) {
+        console.error("Failed to fetch settings", err);
+      }
+    };
+
     fetchAppointments();
+    fetchSettings();
   }, [router]);
+
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const res = await fetch("/api/doctor/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startTime, endTime })
+      });
+      if (res.ok) {
+        setShowSettings(false);
+      } else {
+        alert("Failed to save settings");
+      }
+    } catch (error) {
+      console.error("Failed to save settings", error);
+      alert("Failed to save settings");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const handleStatusChange = async (id: string, status: "CONFIRMED" | "CANCELLED" | "COMPLETED") => {
     try {
       setActionLoadingId(id);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/001084d5-276b-467b-80bc-d645777b50f5', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'doctor-confirm-run',
-          hypothesisId: 'H1-H3',
-          location: 'app/dashboard/doctor/page.tsx:handleStatusChange-entry',
-          message: 'Doctor clicked status change',
-          data: { appointmentId: id, nextStatus: status },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
 
       const res = await fetch(`/api/appointments/${id}/status`, {
         method: "PATCH",
@@ -91,22 +116,6 @@ export default function DoctorDashboardPage() {
         },
         body: JSON.stringify({ status }),
       });
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/001084d5-276b-467b-80bc-d645777b50f5', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'doctor-confirm-run',
-          hypothesisId: 'H2-H4',
-          location: 'app/dashboard/doctor/page.tsx:handleStatusChange-response',
-          message: 'Status change response',
-          data: { statusCode: res.status },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
 
       if (res.status === 401) {
         router.push("/auth/login");
@@ -180,13 +189,63 @@ export default function DoctorDashboardPage() {
               View and manage your upcoming appointments
             </p>
           </div>
-          <Link href="/dashboard">
-            <button className="flex items-center gap-2 bg-gray-900/60 hover:bg-gray-800 text-white px-6 py-3 rounded-full font-bold border border-gray-700 shadow-lg shadow-black/40 hover:shadow-gray-900 transition-all duration-300">
-              <FaUserMd size={16} />
-              Patient View
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-2 bg-gray-900/60 hover:bg-gray-800 text-white px-6 py-3 rounded-full font-bold border border-gray-700 shadow-lg shadow-black/40 hover:shadow-gray-900 transition-all duration-300"
+            >
+              <FaCog size={16} />
+              Availability
             </button>
-          </Link>
+          </div>
         </div>
+
+        {/* Settings Modal */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSettings(false)}>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+              <h2 className="text-2xl font-bold text-white mb-2">Availability Settings</h2>
+              <p className="text-gray-400 mb-6 text-sm">Set your working hours. Patients will only see available slots within these times.</p>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-300 mb-2">Start Time</label>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="block w-full rounded-xl border-gray-700 bg-gray-800 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-300 mb-2">End Time</label>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="block w-full rounded-xl border-gray-700 bg-gray-800 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="flex-1 px-4 py-3 rounded-xl bg-gray-800 text-gray-300 font-bold hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveSettings}
+                  disabled={savingSettings}
+                  className="flex-1 px-4 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingSettings ? "Saving..." : "Save Settings"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-6 mb-8 md:grid-cols-3">
           <div className="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 flex items-center gap-4">

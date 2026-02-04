@@ -54,37 +54,52 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 2. Verify doctor exists and is available
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: doctorId },
+      select: { available: true, startTime: true, endTime: true }
+    });
+
+    if (!doctor) {
+      return NextResponse.json(
+        { message: "Doctor not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!doctor.available) {
+      return NextResponse.json(
+        { message: "Doctor is currently not accepting appointments" },
+        { status: 400 }
+      );
+    }
+
+    // 3. Validate appointment time is within doctor's working hours
+    const appointmentHour = appointmentDate.getHours();
+    const appointmentMinute = appointmentDate.getMinutes();
+    const appointmentTimeString = `${appointmentHour.toString().padStart(2, '0')}:${appointmentMinute.toString().padStart(2, '0')}`;
+
+    const [startH, startM] = doctor.startTime.split(':').map(Number);
+    const [endH, endM] = doctor.endTime.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    const apptMinutes = appointmentHour * 60 + appointmentMinute;
+    const apptEndMinutes = apptMinutes + appointmentType.duration;
+
+    if (apptMinutes < startMinutes || apptEndMinutes > endMinutes) {
+      return NextResponse.json(
+        { message: `Appointment must be within doctor's working hours (${doctor.startTime} - ${doctor.endTime})` },
+        { status: 400 }
+      );
+    }
+
     const durationMinutes = appointmentType.duration;
     const endTime = new Date(appointmentDate.getTime() + durationMinutes * 60000);
 
-    // 2. Transaction: Check for overlaps and create if clear
+    // 4. Transaction: Check for overlaps and create if clear
     const result = await prisma.$transaction(async (tx) => {
       // Check for overlapping appointments for this doctor
-      // Overlap condition: (StartA < EndB) AND (EndA > StartB)
-      const overlap = await tx.appointment.count({
-        where: {
-          doctorId: doctorId,
-          status: { not: 'CANCELLED' },
-          OR: [
-            {
-              // Case: New starts inside existing
-              dateTime: { lt: endTime },
-              endTime: { gt: appointmentDate } // Utilizing the new field if migrated, or fallback logic might be needed if field is null (we handle nulls via defaulting in query if necessary, but here we assume new schema) 
-            }
-          ]
-        }
-      });
-
-      // Note: Since endTime is nullable in schema currently, we need to be careful. 
-      // Ideally, we should enforce endTime. For now, let's assume we populate it.
-      // If the schema change didn't make it required/default, existing data might be null.
-      // A robust query handles nulls, but for this "New Feature" we rely on the migration filling it or defaulting.
-      // Actually, my previous migration didn't backfill endTime for existing appointments. 
-      // FOR ROBUSTNESS: Let's assume start + 30m for legacy rows if endTime is null.
-      // BUT, raw prisma queries are complex. Let's simplify: 
-      // Check overlaps using a simplified robust fetch or assume clean state.
-      // Since I just seeded, the DB is fresh or largely empty. Let's stick to standard logic.
-      // To be safe against nulls in logic:
+      // Handles nullable endTime for legacy data by assuming 30min default
 
       const overlappingAppointments = await tx.appointment.findMany({
         where: {

@@ -22,6 +22,10 @@ export async function GET(request: Request) {
             select: { startTime: true, endTime: true }
         });
 
+        if (!doctor) {
+            return NextResponse.json({ message: "Doctor not found" }, { status: 404 });
+        }
+
         const appointments = await prisma.appointment.findMany({
             where: {
                 doctorId: doctorId,

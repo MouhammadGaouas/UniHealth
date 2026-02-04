@@ -66,9 +66,12 @@ export default function BookingPage() {
             if (res.ok) {
                 const data = await res.json();
                 setDoctors(data.doctors);
+            } else {
+                setError("Failed to load doctors. Please refresh the page.");
             }
         } catch (err) {
             console.error(err);
+            setError("Failed to load doctors. Please refresh the page.");
         }
     };
 
@@ -78,9 +81,12 @@ export default function BookingPage() {
             if (res.ok) {
                 const data = await res.json();
                 setAppointmentTypes(data.appointmentTypes);
+            } else {
+                setError("Failed to load appointment types.");
             }
         } catch (err) {
             console.error(err);
+            setError("Failed to load appointment types.");
         }
     };
 
@@ -331,7 +337,7 @@ export default function BookingPage() {
                             <div className="bg-gray-800 rounded-2xl shadow-lg border border-gray-700 overflow-hidden">
                                 <div className="bg-blue-600 px-6 py-4 text-white flex justify-between items-center">
                                     <h3 className="font-bold">Appointment Summary</h3>
-                                    <span className="text-blue-200 text-sm">ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}</span>
+                                    <span className="text-blue-200 text-sm">Pending Confirmation</span>
                                 </div>
                                 <div className="p-6 space-y-6">
                                     <div className="grid grid-cols-2 gap-6">

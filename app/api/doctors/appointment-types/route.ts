@@ -1,23 +1,36 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const doctorId = searchParams.get('doctorId');
+  const { searchParams } = new URL(request.url);
+  const doctorId = searchParams.get("doctorId");
 
-    if (!doctorId) {
-        return NextResponse.json({ message: "Missing doctorId" }, { status: 400 });
+  if (!doctorId) {
+    return NextResponse.json({ message: "Missing doctorId" }, { status: 400 });
+  }
+
+  try {
+    // Verify doctor exists
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: doctorId },
+      select: { id: true }
+    });
+
+    if (!doctor) {
+      return NextResponse.json({ message: "Doctor not found" }, { status: 404 });
     }
 
-    try {
-        const appointmentTypes = await prisma.appointmentType.findMany({
-            where: { doctorId },
-            orderBy: { duration: 'asc' }
-        });
+    const appointmentTypes = await prisma.appointmentType.findMany({
+      where: { doctorId },
+      orderBy: { duration: "asc" },
+    });
 
-        return NextResponse.json({ appointmentTypes }, { status: 200 });
-    } catch (error) {
-        console.error("Error fetching appointment types:", error);
-        return NextResponse.json({ message: "Error fetching appointment types" }, { status: 500 });
-    }
+    return NextResponse.json({ appointmentTypes }, { status: 200 });
+  } catch (error) {
+    console.error("Error fetching appointment types:", error);
+    return NextResponse.json(
+      { message: "Error fetching appointment types" },
+      { status: 500 },
+    );
+  }
 }
