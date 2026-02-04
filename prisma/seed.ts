@@ -109,6 +109,20 @@ async function main() {
 
         console.log(`Created/Updated: ${user.name}`)
     }
+
+    // Seed Admin User
+    const adminEmail = 'admin@unihealth.com';
+    const adminUser = await prisma.user.upsert({
+        where: { email: adminEmail },
+        update: {},
+        create: {
+            email: adminEmail,
+            name: 'Admin User',
+            password,
+            role: 'ADMIN',
+        },
+    });
+    console.log(`Created/Updated Admin: ${adminUser.name}`);
 }
 
 main()

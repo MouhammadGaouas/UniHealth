@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthUser, requireRole } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
+  
   const user = getAuthUser(req);
 
   if (!user) {
