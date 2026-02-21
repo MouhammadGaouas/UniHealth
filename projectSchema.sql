@@ -3,12 +3,17 @@ CREATE TYPE "Role" AS ENUM ('PATIENT', 'DOCTOR', 'ADMIN');
 
 CREATE TYPE "AppointmentStatus" AS ENUM ('PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED');
 
+CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE');
+
 -- Tables
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "name" TEXT,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
+    "phoneNumber" TEXT,
+    "gender" "Gender",
+    "birthday" TIMESTAMP(3),
     "role" "Role" NOT NULL DEFAULT 'PATIENT',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

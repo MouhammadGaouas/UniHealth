@@ -21,6 +21,9 @@ async function main() {
         {
             email: 'dr.smith@unihealth.com',
             name: 'Dr. Sarah Smith',
+            phoneNumber: '+213555010001',
+            gender: 'FEMALE' as const,
+            birthday: new Date('1985-03-15'),
             specialty: 'Psychologist',
             bio: 'Specialist in student anxiety and stress management.',
         },
@@ -28,6 +31,9 @@ async function main() {
         {
             email: 'dr.jones@unihealth.com',
             name: 'Dr. Michael Jones',
+            phoneNumber: '+213555010002',
+            gender: 'MALE' as const,
+            birthday: new Date('1978-07-22'),
             specialty: 'General Practitioner',
             bio: 'General health and urgent care services.',
         },
@@ -35,6 +41,9 @@ async function main() {
         {
             email: 'dr.lee@unihealth.com',
             name: 'Dr. Emily Lee',
+            phoneNumber: '+213555010003',
+            gender: 'FEMALE' as const,
+            birthday: new Date('1990-11-08'),
             specialty: 'Dermatologist',
             bio: 'Expert in skin care and acne treatment for young adults.',
         },
@@ -42,12 +51,18 @@ async function main() {
         {
             email: 'dr.patel@unihealth.com',
             name: 'Dr. Raj Patel',
+            phoneNumber: '+213555010004',
+            gender: 'MALE' as const,
+            birthday: new Date('1982-01-30'),
             specialty: 'Nutritionist',
             bio: 'Helping students maintain a healthy diet and lifestyle.',
         },
         {
             email: 'dr.garcia@unihealth.com',
             name: 'Dr. Elena Garcia',
+            phoneNumber: '+213555010005',
+            gender: 'FEMALE' as const,
+            birthday: new Date('1988-06-12'),
             specialty: 'Sports Medicine',
             bio: 'Focus on sports injuries and physical therapy.',
         }
@@ -63,6 +78,9 @@ async function main() {
                 email: doc.email,
                 name: doc.name,
                 password,
+                phoneNumber: doc.phoneNumber,
+                gender: doc.gender,
+                birthday: doc.birthday,
                 role: 'DOCTOR',
                 doctorProfile: {
                     create: {
@@ -119,6 +137,9 @@ async function main() {
             email: adminEmail,
             name: 'Admin User',
             password,
+            phoneNumber: '+213555000000',
+            gender: 'MALE',
+            birthday: new Date('1975-05-20'),
             role: 'ADMIN',
         },
     });

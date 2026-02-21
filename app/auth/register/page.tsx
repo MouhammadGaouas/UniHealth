@@ -3,12 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FaUser, FaEnvelope, FaLock, FaUserPlus } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaPhone, FaVenusMars, FaCalendarAlt } from "react-icons/fa";
 
 export default function RegisterPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [phoneNumber, setPhoneNumber] = useState("");
+    const [gender, setGender] = useState("");
+    const [birthday, setBirthday] = useState("");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
@@ -22,11 +25,17 @@ export default function RegisterPage() {
             const res = await fetch("/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, email, password }),
+                body: JSON.stringify({
+                    name,
+                    email,
+                    password,
+                    phoneNumber: phoneNumber || undefined,
+                    gender: gender || undefined,
+                    birthday: birthday || undefined,
+                }),
             });
 
             if (res.ok) {
-                // Automatically redirect to login or dashboard
                 router.push("/auth/login");
             } else {
                 const data = await res.json();
@@ -38,6 +47,9 @@ export default function RegisterPage() {
             setIsLoading(false);
         }
     };
+
+    const inputClass =
+        "block w-full rounded-lg border border-gray-700 bg-gray-900/50 py-3 pl-10 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500 sm:text-sm transition-colors outline-none";
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-[#020617] px-4 relative overflow-hidden">
@@ -57,6 +69,7 @@ export default function RegisterPage() {
 
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
                     <div className="space-y-4">
+                        {/* Full Name */}
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
                                 <FaUser />
@@ -64,12 +77,14 @@ export default function RegisterPage() {
                             <input
                                 type="text"
                                 required
-                                className="block w-full rounded-lg border border-gray-700 bg-gray-900/50 py-3 pl-10 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500 sm:text-sm transition-colors outline-none"
+                                className={inputClass}
                                 placeholder="Full Name"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                             />
                         </div>
+
+                        {/* Email */}
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
                                 <FaEnvelope />
@@ -77,12 +92,14 @@ export default function RegisterPage() {
                             <input
                                 type="email"
                                 required
-                                className="block w-full rounded-lg border border-gray-700 bg-gray-900/50 py-3 pl-10 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500 sm:text-sm transition-colors outline-none"
+                                className={inputClass}
                                 placeholder="Email address"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />
                         </div>
+
+                        {/* Password */}
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
                                 <FaLock />
@@ -90,10 +107,54 @@ export default function RegisterPage() {
                             <input
                                 type="password"
                                 required
-                                className="block w-full rounded-lg border border-gray-700 bg-gray-900/50 py-3 pl-10 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500 sm:text-sm transition-colors outline-none"
+                                className={inputClass}
                                 placeholder="Password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Phone Number */}
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                                <FaPhone />
+                            </div>
+                            <input
+                                type="tel"
+                                className={inputClass}
+                                placeholder="Phone Number (optional)"
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Gender */}
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                                <FaVenusMars />
+                            </div>
+                            <select
+                                className={`${inputClass} appearance-none`}
+                                value={gender}
+                                onChange={(e) => setGender(e.target.value)}
+                            >
+                                <option value="" className="bg-gray-900 text-gray-500">Gender (optional)</option>
+                                <option value="MALE" className="bg-gray-900 text-white">Male</option>
+                                <option value="FEMALE" className="bg-gray-900 text-white">Female</option>
+                            </select>
+                        </div>
+
+                        {/* Birthday */}
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                                <FaCalendarAlt />
+                            </div>
+                            <input
+                                type="date"
+                                className={`${inputClass} [color-scheme:dark]`}
+                                placeholder="Birthday (optional)"
+                                value={birthday}
+                                onChange={(e) => setBirthday(e.target.value)}
                             />
                         </div>
                     </div>

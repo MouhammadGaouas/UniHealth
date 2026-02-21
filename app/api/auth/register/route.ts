@@ -4,10 +4,24 @@ import bcrypt from 'bcrypt';
 
 export async function POST(req: Request) {
     try {
-        const { name, email, password } = await req.json();
+        const { name, email, password, phoneNumber, gender, birthday } = await req.json();
 
         if (!name || !email || !password) {
             return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
+        }
+
+        // Validate gender if provided
+        if (gender && !['MALE', 'FEMALE'].includes(gender)) {
+            return NextResponse.json({ message: "Gender must be MALE or FEMALE" }, { status: 400 });
+        }
+
+        // Validate birthday if provided
+        let parsedBirthday: Date | undefined;
+        if (birthday) {
+            parsedBirthday = new Date(birthday);
+            if (isNaN(parsedBirthday.getTime())) {
+                return NextResponse.json({ message: "Invalid birthday date" }, { status: 400 });
+            }
         }
 
         const isExist = await prisma.user.findUnique({
@@ -25,6 +39,9 @@ export async function POST(req: Request) {
                 name,
                 email,
                 password: hashedPassword,
+                phoneNumber: phoneNumber || undefined,
+                gender: gender || undefined,
+                birthday: parsedBirthday,
                 role: 'PATIENT',
             },
         });

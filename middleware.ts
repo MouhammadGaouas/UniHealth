@@ -8,6 +8,7 @@ const protectedRoutes = ['/dashboard', '/book'];
 // Role-specific route requirements
 const roleRoutes: Record<string, string[]> = {
     '/dashboard/admin': ['ADMIN'],
+    '/dashboard/doctor/history': ['DOCTOR'],
     '/dashboard/doctor': ['DOCTOR'],
 };
 

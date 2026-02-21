@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthUser, requireRole } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
-  
+
   const user = getAuthUser(req);
 
   if (!user) {
@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     const appointments = await prisma.appointment.findMany({
       where: {
         doctorId: doctor.id,
+        status: { in: ['PENDING', 'CONFIRMED'] },
       },
       include: {
         patient: {

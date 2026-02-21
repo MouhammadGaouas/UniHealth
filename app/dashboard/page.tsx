@@ -128,11 +128,19 @@ export default function DashboardPage() {
             <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">My Dashboard</h1>
             <p className="text-gray-400 mt-2">Manage your appointments and health records</p>
           </div>
-          <Link href="/book">
-            <button className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white px-6 py-3 rounded-full font-bold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:scale-105 transition-all duration-300">
-              <FaPlus size={14} /> Book New Appointment
-            </button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/history">
+              <button className="flex items-center gap-2 bg-gray-900/60 hover:bg-gray-800 text-white px-6 py-3 rounded-full font-bold border border-gray-700 shadow-lg hover:shadow-gray-900 transition-all duration-300">
+                <FaCalendarAlt size={14} />
+                History
+              </button>
+            </Link>
+            <Link href="/book">
+              <button className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white px-6 py-3 rounded-full font-bold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:scale-105 transition-all duration-300">
+                <FaPlus size={14} /> Book New Appointment
+              </button>
+            </Link>
+          </div>
         </div>
 
         {/* Upcoming Appointments */}
@@ -163,21 +171,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Past Appointments */}
-        {pastAppointments.length > 0 && (
-          <div className="glass border border-gray-800 rounded-2xl p-8 shadow-xl animate-[slideUp_0.7s_ease-out]">
-            <h2 className="text-2xl font-bold text-white mb-8 border-b border-gray-800 pb-4">Past Appointments</h2>
-            <div className="grid gap-6">
-              {pastAppointments.slice(0, 5).map((apt) => (
-                <AppointmentCard
-                  key={apt.id}
-                  appointment={apt}
-                  isPast
-                />
-              ))}
-            </div>
-          </div>
-        )}
+
       </div>
     </div>
   );

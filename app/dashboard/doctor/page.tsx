@@ -136,9 +136,14 @@ export default function DoctorDashboardPage() {
       const data = await res.json();
       const updated = data.appointment as DoctorAppointment;
 
-      setAppointments((prev) =>
-        prev.map((apt) => (apt.id === id ? { ...apt, status: updated.status } : apt))
-      );
+      // Remove completed/cancelled appointments from dashboard (they go to history)
+      if (updated.status === "COMPLETED" || updated.status === "CANCELLED") {
+        setAppointments((prev) => prev.filter((apt) => apt.id !== id));
+      } else {
+        setAppointments((prev) =>
+          prev.map((apt) => (apt.id === id ? { ...apt, status: updated.status } : apt))
+        );
+      }
     } catch (err) {
       console.error("Error updating appointment status", err);
     } finally {
@@ -190,6 +195,13 @@ export default function DoctorDashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/doctor/history"
+              className="flex items-center gap-2 bg-gray-900/60 hover:bg-gray-800 text-white px-6 py-3 rounded-full font-bold border border-gray-700 shadow-lg shadow-black/40 hover:shadow-gray-900 transition-all duration-300"
+            >
+              <FaCalendarAlt size={16} />
+              History
+            </Link>
             <button
               onClick={() => setShowSettings(true)}
               className="flex items-center gap-2 bg-gray-900/60 hover:bg-gray-800 text-white px-6 py-3 rounded-full font-bold border border-gray-700 shadow-lg shadow-black/40 hover:shadow-gray-900 transition-all duration-300"

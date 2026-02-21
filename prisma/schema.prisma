@@ -26,11 +26,19 @@ enum AppointmentStatus {
   COMPLETED
 }
 
+enum Gender {
+  MALE
+  FEMALE
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
   password      String
+  phoneNumber   String?
+  gender        Gender?
+  birthday      DateTime?
   role          Role      @default(PATIENT)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
