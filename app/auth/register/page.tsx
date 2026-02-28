@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaPhone, FaVenusMars, FaCalendarAlt } from "react-icons/fa";
+import { authClient } from "@/lib/auth-client";
 
 export default function RegisterPage() {
     const [name, setName] = useState("");
@@ -22,26 +23,19 @@ export default function RegisterPage() {
         setIsLoading(true);
 
         try {
-            const res = await fetch("/api/auth/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name,
-                    email,
-                    password,
-                    phoneNumber: phoneNumber || undefined,
-                    gender: gender || undefined,
-                    birthday: birthday || undefined,
-                }),
+            const result = await authClient.signUp.email({
+                name,
+                email,
+                password,
             });
 
-            if (res.ok) {
-                router.push("/auth/login");
-            } else {
-                const data = await res.json();
-                setError(data.message || "Registration failed");
+            if (result.error) {
+                setError(result.error.message || "Registration failed");
                 setIsLoading(false);
+                return;
             }
+
+            router.push("/auth/login");
         } catch (err) {
             setError("An unexpected error occurred");
             setIsLoading(false);

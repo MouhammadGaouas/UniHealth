@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
 import BookingProgress from "@/components/booking/BookingProgress";
 import DoctorSelection from "@/components/booking/DoctorSelection";
 import AppointmentTypeSelection from "@/components/booking/AppointmentTypeSelection";
@@ -46,6 +47,13 @@ export default function BookingPage() {
     const [error, setError] = useState("");
 
     useEffect(() => {
+        // Check auth on mount
+        authClient.getSession().then((result) => {
+            if (!result.data) {
+                router.push("/auth/login?redirect=/book");
+                return;
+            }
+        });
         fetchDoctors();
     }, []);
 

@@ -1,13 +1,16 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthUser, requireRole } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
-    const userReq = getAuthUser(req);
-    try {
-      requireRole(userReq, "ADMIN");
-    } catch {
+    const session = await auth.api.getSession({ headers: req.headers });
+
+    if (!session) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    if ((session.user as Record<string, unknown>).role !== "ADMIN") {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
@@ -48,12 +51,19 @@ export async function POST(req: NextRequest) {
           userId,
           specialty,
           available: true,
+          appointmentTypes: {
+            create: [
+              { name: "Quick Consultation", duration: 15, price: 0 },
+              { name: "Follow-up", duration: 30, price: 0 },
+              { name: "First Visit", duration: 45, price: 0 }
+            ]
+          }
         },
       }),
     ]);
 
     return NextResponse.json(
-      { message: "User promoted to Doctor" },
+      { message: "User promoted to Doctor and default appointment types created" },
       { status: 200 },
     );
   } catch (error) {

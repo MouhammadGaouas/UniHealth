@@ -35,16 +35,68 @@ model User {
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
-  password      String
+  emailVerified Boolean   @default(false)
+  image         String?
+  password      String?   // kept for backward compat; better-auth uses Account table
   phoneNumber   String?
   gender        Gender?
   birthday      DateTime?
   role          Role      @default(PATIENT)
+  banned        Boolean?
+  banReason     String?
+  banExpires    DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   patientAppointments Appointment[] @relation("PatientAppointments")
-  doctorProfile      Doctor?       
+  doctorProfile       Doctor?
+  sessions            Session[]
+  accounts            Account[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  impersonatedBy String?
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String    @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
 }
 
 model Doctor {

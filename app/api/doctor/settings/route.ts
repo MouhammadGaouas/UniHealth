@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
-    const user = getAuthUser(req);
+    const session = await auth.api.getSession({ headers: req.headers });
 
-    if (!user || user.role !== 'DOCTOR') {
+    if (!session || (session.user as Record<string, unknown>).role !== 'DOCTOR') {
         return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+
+    const user = session.user;
 
     try {
         const doctor = await prisma.doctor.findUnique({
@@ -27,11 +29,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-    const user = getAuthUser(req);
+    const session = await auth.api.getSession({ headers: req.headers });
 
-    if (!user || user.role !== 'DOCTOR') {
+    if (!session || (session.user as Record<string, unknown>).role !== 'DOCTOR') {
         return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+
+    const user = session.user;
 
     try {
         const { startTime, endTime } = await req.json();

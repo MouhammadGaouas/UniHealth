@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
-    const user = getAuthUser(req);
+    const session = await auth.api.getSession({ headers: req.headers });
 
-    if (!user) {
+    if (!session) {
         return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+
+    const user = session.user;
 
     try {
         const appointments = await prisma.appointment.findMany({

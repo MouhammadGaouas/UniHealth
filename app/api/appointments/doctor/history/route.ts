@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser, requireRole } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
-    const user = getAuthUser(req);
+    const session = await auth.api.getSession({ headers: req.headers });
 
-    if (!user) {
+    if (!session) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    try {
-        try {
-            requireRole(user, 'DOCTOR');
-        } catch {
-            return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-        }
+    const user = session.user;
 
+    if ((user as Record<string, unknown>).role !== 'DOCTOR') {
+        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
+    try {
         const doctor = await prisma.doctor.findUnique({
             where: { userId: user.id },
         });

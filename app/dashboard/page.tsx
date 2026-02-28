@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FaCalendarAlt, FaUserMd, FaPlus, FaClock, FaCheckCircle, FaExclamationCircle, FaTimes } from "react-icons/fa";
+import { authClient } from "@/lib/auth-client";
 
 interface Appointment {
   id: string;
@@ -30,24 +31,23 @@ export default function DashboardPage() {
 
   const fetchUser = async () => {
     try {
-      const res = await fetch("/api/auth/me");
-      if (res.status === 401) {
+      const sessionResult = await authClient.getSession();
+      if (!sessionResult.data) {
         router.push("/auth/login");
         return;
       }
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
-        // Redirect doctors to their dedicated dashboard
-        if (data.role === "DOCTOR") {
-          router.push("/dashboard/doctor");
-          return;
-        }
-        // Redirect admins to their dedicated dashboard
-        if (data.role === "ADMIN") {
-          router.push("/dashboard/admin");
-          return;
-        }
+      const data = sessionResult.data.user;
+      setUser(data);
+      const userRole = (data as Record<string, unknown>).role as string;
+      // Redirect doctors to their dedicated dashboard
+      if (userRole === "DOCTOR") {
+        router.push("/dashboard/doctor");
+        return;
+      }
+      // Redirect admins to their dedicated dashboard
+      if (userRole === "ADMIN") {
+        router.push("/dashboard/admin");
+        return;
       }
     } catch (error) {
       console.error("Failed to fetch user", error);

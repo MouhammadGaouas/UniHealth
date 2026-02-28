@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser, requireRole } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
+  const session = await auth.api.getSession({ headers: req.headers });
 
-  const user = getAuthUser(req);
-
-  if (!user) {
+  if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
-  try {
-    // Ensure only doctors can access this endpoint
-    try {
-      requireRole(user, 'DOCTOR');
-    } catch {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-    }
+  const user = session.user;
 
-    // Find the doctor's profile linked to this user
+  if ((user as Record<string, unknown>).role !== 'DOCTOR') {
+    return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+  }
+
+  try {
     const doctor = await prisma.doctor.findUnique({
       where: { userId: user.id },
     });
@@ -57,4 +54,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-

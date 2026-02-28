@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FaEnvelope, FaLock, FaSignInAlt } from "react-icons/fa";
+import { authClient } from "@/lib/auth-client";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -18,43 +19,35 @@ export default function LoginPage() {
         setIsLoading(true);
 
         try {
-            const res = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
+            const result = await authClient.signIn.email({
+                email,
+                password,
             });
 
-            if (res.ok) {
-                // Login succeeded, token cookie is now set.
-                // Fetch the authenticated user to determine their role
-                try {
-                    const meRes = await fetch("/api/auth/me", {
-                        method: "GET",
-                        cache: "no-store",
-                    });
+            if (result.error) {
+                setError(result.error.message || "Login failed");
+                setIsLoading(false);
+                return;
+            }
 
-                    if (meRes.ok) {
-                        const me = await meRes.json();
+            // Fetch session to determine role-based redirect
+            const sessionResult = await authClient.getSession();
 
-                        if (me.role === "DOCTOR") {
-                            router.push("/dashboard/doctor");
-                        } else if (me.role === "ADMIN") {
-                            router.push("/dashboard/admin");
-                        } else {
-                            router.push("/dashboard");
-                        }
-                    } else {
-                        // Fallback if /api/auth/me fails for some reason
-                        router.push("/dashboard");
-                    }
-                } finally {
-                    router.refresh();
+            if (sessionResult.data) {
+                const userRole = (sessionResult.data.user as Record<string, unknown>).role as string;
+
+                if (userRole === "DOCTOR") {
+                    router.push("/dashboard/doctor");
+                } else if (userRole === "ADMIN") {
+                    router.push("/dashboard/admin");
+                } else {
+                    router.push("/dashboard");
                 }
             } else {
-                const data = await res.json();
-                setError(data.message || "Login failed");
-                setIsLoading(false);
+                router.push("/dashboard");
             }
+
+            router.refresh();
         } catch (err) {
             setError("An unexpected error occurred");
             setIsLoading(false);

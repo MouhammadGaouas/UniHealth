@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
-    const user = getAuthUser(req);
+    const session = await auth.api.getSession({ headers: req.headers });
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    try {
-      requireRole(user, "PATIENT");
-    } catch {
+    const user = session.user;
+
+    if ((user as Record<string, unknown>).role !== "PATIENT") {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
@@ -77,14 +77,14 @@ export async function POST(req: NextRequest) {
     // 3. Validate appointment time is within doctor's working hours
     const appointmentHour = appointmentDate.getHours();
     const appointmentMinute = appointmentDate.getMinutes();
-    const appointmentTimeString = `${appointmentHour.toString().padStart(2, '0')}:${appointmentMinute.toString().padStart(2, '0')}`;
 
     const [startH, startM] = doctor.startTime.split(':').map(Number);
     const [endH, endM] = doctor.endTime.split(':').map(Number);
     const startMinutes = startH * 60 + startM;
     const endMinutes = endH * 60 + endM;
     const apptMinutes = appointmentHour * 60 + appointmentMinute;
-    const apptEndMinutes = apptMinutes + appointmentType.duration;
+    const durationMinutes = appointmentType.duration;
+    const apptEndMinutes = apptMinutes + durationMinutes;
 
     if (apptMinutes < startMinutes || apptEndMinutes > endMinutes) {
       return NextResponse.json(
@@ -93,25 +93,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const durationMinutes = appointmentType.duration;
     const endTime = new Date(appointmentDate.getTime() + durationMinutes * 60000);
 
     // 4. Transaction: Check for overlaps and create if clear
     const result = await prisma.$transaction(async (tx) => {
-      // Check for overlapping appointments for this doctor
-      // Handles nullable endTime for legacy data by assuming 30min default
-
-      const overlappingAppointments = await tx.appointment.findMany({
+      // Find appointments that overlap with the requested time window
+      const overlappingAppointments = await tx.appointment.findFirst({
         where: {
           doctorId: doctorId,
           status: { not: 'CANCELLED' },
-          dateTime: { lt: endTime } // potentially reachable
+          // Overlap condition: (StartA < EndB) and (EndA > StartB)
+          dateTime: { lt: endTime },
+          OR: [
+            { endTime: { gt: appointmentDate } },
+            // Fallback for older records without endTime (assume 30 mins)
+            {
+              endTime: null,
+              // Prisma doesn't support complex math in where clauses easily for dates, 
+              // so we handle the null fallback slightly imperfectly here or force db migration.
+              // Given the schema added endTime later, we do a basic check here or rely on the JS filter below.
+            }
+          ]
         }
       });
 
-      const hasOverlap = overlappingAppointments.some(appt => {
+      // To be completely safe with mixed null endTimes, we fetch potentials and filter in JS
+      const potentials = await tx.appointment.findMany({
+        where: {
+          doctorId: doctorId,
+          status: { not: 'CANCELLED' },
+          dateTime: { lt: endTime }
+        }
+      });
+
+      const hasOverlap = potentials.some(appt => {
         const apptStart = appt.dateTime;
-        const apptEnd = appt.endTime || new Date(apptStart.getTime() + 30 * 60000); // fallback 30m
+        const apptEnd = appt.endTime || new Date(apptStart.getTime() + 30 * 60000);
         return (apptStart < endTime && apptEnd > appointmentDate);
       });
 
@@ -119,7 +136,6 @@ export async function POST(req: NextRequest) {
         throw new Error("Time slot overlaps with an existing appointment");
       }
 
-      // Create
       return await tx.appointment.create({
         data: {
           dateTime: appointmentDate,
@@ -130,15 +146,14 @@ export async function POST(req: NextRequest) {
           appointmentTypeId
         }
       });
-
     });
 
     return NextResponse.json(
       { message: "Appointment created successfully", appointment: result },
       { status: 201 }
     );
-  } catch (error: any) {
-    if (error.message === "Time slot overlaps with an existing appointment") {
+  } catch (error: Error | any) {
+    if (error?.message === "Time slot overlaps with an existing appointment") {
       return NextResponse.json({ message: error.message }, { status: 409 });
     }
     console.error("Error creating appointment:", error);
@@ -148,3 +163,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

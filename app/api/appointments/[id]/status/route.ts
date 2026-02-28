@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 
 const ALLOWED_STATUSES = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'] as const;
 type AllowedStatus = (typeof ALLOWED_STATUSES)[number];
 
-export async function PATCH(req: NextRequest) {
-  const user = getAuthUser(req);
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const appointmentId = params.id;
+  const session = await auth.api.getSession({ headers: req.headers });
 
-  if (!user) {
+  if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
-  // Extract appointment id from URL path
-  const url = new URL(req.url);
-  const match = url.pathname.match(/\/api\/appointments\/([^/]+)\/status/);
-  const appointmentId = match?.[1];
+  const user = session.user;
+  const userRole = (user as Record<string, unknown>).role as string;
 
   if (!appointmentId) {
     return NextResponse.json(
@@ -52,37 +52,33 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Authorization logic based on user role
-    if (user.role === 'DOCTOR') {
-      // Doctors can update status of appointments assigned to them
+    if (userRole === 'DOCTOR') {
       if (appointment.doctor.userId !== user.id) {
         return NextResponse.json(
           { message: 'Appointment not found for this doctor' },
           { status: 404 }
         );
       }
-    } else if (user.role === 'PATIENT') {
-      // Patients can only cancel their own appointments
+    } else if (userRole === 'PATIENT') {
       if (appointment.patientId !== user.id) {
         return NextResponse.json(
           { message: 'Appointment not found' },
           { status: 404 }
         );
       }
-      // Patients can only cancel, not confirm or complete
       if (status !== 'CANCELLED') {
         return NextResponse.json(
           { message: 'Patients can only cancel appointments' },
           { status: 403 }
         );
       }
-      // Cannot cancel already completed or cancelled appointments
       if (appointment.status === 'COMPLETED' || appointment.status === 'CANCELLED') {
         return NextResponse.json(
           { message: `Cannot cancel an appointment that is already ${appointment.status.toLowerCase()}` },
           { status: 400 }
         );
       }
-    } else if (user.role === 'ADMIN') {
+    } else if (userRole === 'ADMIN') {
       // Admins can update any appointment status
     } else {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });

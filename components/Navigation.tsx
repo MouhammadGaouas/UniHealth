@@ -2,10 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { HiMenu, HiX } from "react-icons/hi"; // Using simpler icons if available, or SVG is fine too
-// Using SVG directly to avoid dependency issues if react-icons packages vary
-// Actually react-icons is installed. Let's use simple SVG for zero-dependency risk in this file or stick to what was there.
-// The original used SVGs. I'll stick to SVGs but cleaner.
+import { authClient } from "@/lib/auth-client";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,13 +15,15 @@ const Navigation = () => {
     };
     window.addEventListener("scroll", handleScroll);
 
-    // Fetch user
+    // Fetch user session via better-auth
     const fetchUser = async () => {
       try {
-        const res = await fetch("/api/auth/me");
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data);
+        const sessionResult = await authClient.getSession();
+        if (sessionResult.data?.user) {
+          setUser({
+            name: sessionResult.data.user.name || "",
+            email: sessionResult.data.user.email,
+          });
         }
       } catch (error) {
         console.error("Failed to fetch user", error);
@@ -37,7 +36,7 @@ const Navigation = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await authClient.signOut();
       setUser(null);
       window.location.href = "/";
     } catch (error) {
