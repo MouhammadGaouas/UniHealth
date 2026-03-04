@@ -11,6 +11,9 @@ import {
   FaCheckCircle,
   FaExclamationCircle,
   FaCog,
+  FaFileMedical,
+  FaTimes,
+  FaSave,
 } from "react-icons/fa";
 
 interface DoctorAppointment {
@@ -25,6 +28,13 @@ interface DoctorAppointment {
   };
 }
 
+interface NoteFormData {
+  title: string;
+  content: string;
+  category: "DIAGNOSIS" | "PRESCRIPTION" | "FOLLOW_UP" | "GENERAL";
+  isConfidential: boolean;
+}
+
 export default function DoctorDashboardPage() {
   const [appointments, setAppointments] = useState<DoctorAppointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +44,15 @@ export default function DoctorDashboardPage() {
   const [endTime, setEndTime] = useState("17:00");
   const [savingSettings, setSavingSettings] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [noteForm, setNoteForm] = useState<NoteFormData>({
+    title: "",
+    content: "",
+    category: "GENERAL",
+    isConfidential: false,
+  });
+  const [submittingNote, setSubmittingNote] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -128,7 +147,6 @@ export default function DoctorDashboardPage() {
       }
 
       if (!res.ok) {
-        // Optionally read error message
         console.error("Failed to update appointment status");
         return;
       }
@@ -136,8 +154,12 @@ export default function DoctorDashboardPage() {
       const data = await res.json();
       const updated = data.appointment as DoctorAppointment;
 
-      // Remove completed/cancelled appointments from dashboard (they go to history)
-      if (updated.status === "COMPLETED" || updated.status === "CANCELLED") {
+      // If marking as completed, open notes modal
+      if (status === "COMPLETED") {
+        setSelectedAppointmentId(id);
+        setShowNoteModal(true);
+        setAppointments((prev) => prev.filter((apt) => apt.id !== id));
+      } else if (updated.status === "COMPLETED" || updated.status === "CANCELLED") {
         setAppointments((prev) => prev.filter((apt) => apt.id !== id));
       } else {
         setAppointments((prev) =>
@@ -148,6 +170,52 @@ export default function DoctorDashboardPage() {
       console.error("Error updating appointment status", err);
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  const handleOpenNoteModal = (appointmentId: string) => {
+    setSelectedAppointmentId(appointmentId);
+    setNoteForm({
+      title: "",
+      content: "",
+      category: "GENERAL",
+      isConfidential: false,
+    });
+    setShowNoteModal(true);
+  };
+
+  const handleSubmitNote = async () => {
+    if (!selectedAppointmentId || !noteForm.title.trim() || !noteForm.content.trim()) {
+      alert("Title and content are required");
+      return;
+    }
+
+    setSubmittingNote(true);
+    try {
+      const res = await fetch(`/api/appointments/${selectedAppointmentId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(noteForm),
+      });
+
+      if (res.ok) {
+        setShowNoteModal(false);
+        setSelectedAppointmentId(null);
+        setNoteForm({
+          title: "",
+          content: "",
+          category: "GENERAL",
+          isConfidential: false,
+        });
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to create note");
+      }
+    } catch (error) {
+      console.error("Error creating note:", error);
+      alert("Failed to create note");
+    } finally {
+      setSubmittingNote(false);
     }
   };
 
@@ -424,6 +492,15 @@ export default function DoctorDashboardPage() {
                           </button>
                         </>
                       )}
+                      {apt.status === "COMPLETED" && (
+                        <button
+                          onClick={() => handleOpenNoteModal(apt.id)}
+                          className="px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-600/20 text-purple-400 border border-purple-500/30 hover:bg-purple-600/30 transition-colors flex items-center gap-1"
+                        >
+                          <FaFileMedical size={10} />
+                          Add Note
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -431,6 +508,98 @@ export default function DoctorDashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Notes Modal */}
+        {showNoteModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowNoteModal(false)}>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <FaFileMedical className="text-blue-400" />
+                  Add Consultation Note
+                </h2>
+                <button
+                  onClick={() => setShowNoteModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <FaTimes size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-gray-300 mb-2">Title *</label>
+                  <input
+                    type="text"
+                    value={noteForm.title}
+                    onChange={(e) => setNoteForm({ ...noteForm, title: e.target.value })}
+                    className="block w-full rounded-xl border-gray-700 bg-gray-800 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    placeholder="e.g. Follow-up Instructions"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-300 mb-2">Category</label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {(["DIAGNOSIS", "PRESCRIPTION", "FOLLOW_UP", "GENERAL"] as const).map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setNoteForm({ ...noteForm, category: cat })}
+                        className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all ${noteForm.category === cat
+                            ? "bg-blue-600 text-white border-blue-500"
+                            : "bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500"
+                          }`}
+                      >
+                        {cat.replace("_", " ")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-300 mb-2">Content *</label>
+                  <textarea
+                    value={noteForm.content}
+                    onChange={(e) => setNoteForm({ ...noteForm, content: e.target.value })}
+                    rows={6}
+                    className="block w-full rounded-xl border-gray-700 bg-gray-800 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
+                    placeholder="Enter detailed notes, instructions, prescriptions, etc."
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                  <input
+                    type="checkbox"
+                    id="isConfidential"
+                    checked={noteForm.isConfidential}
+                    onChange={(e) => setNoteForm({ ...noteForm, isConfidential: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-600 focus:ring-offset-gray-800"
+                  />
+                  <label htmlFor="isConfidential" className="text-sm font-medium text-gray-300 cursor-pointer">
+                    Mark as confidential (only visible to healthcare providers)
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8 pt-6 border-t border-gray-800">
+                <button
+                  onClick={() => setShowNoteModal(false)}
+                  className="flex-1 px-4 py-3 rounded-xl bg-gray-800 text-gray-300 font-bold hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitNote}
+                  disabled={submittingNote || !noteForm.title.trim() || !noteForm.content.trim()}
+                  className="flex-1 px-4 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <FaSave size={14} />
+                  {submittingNote ? "Saving..." : "Save Note"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

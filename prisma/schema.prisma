@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -13,9 +10,14 @@ datasource db {
   provider = "postgresql"
 }
 
+// ──────────────────────────────────────────────
+// Enums
+// ──────────────────────────────────────────────
+
 enum Role {
   PATIENT
   DOCTOR
+  ORG_ADMIN
   ADMIN
 }
 
@@ -31,15 +33,52 @@ enum Gender {
   FEMALE
 }
 
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  TRIALING
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum OrganizationType {
+  HOSPITAL
+  CLINIC
+  LABORATORY
+  PHARMACY
+  OTHER
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NoteCategory {
+  DIAGNOSIS
+  PRESCRIPTION
+  FOLLOW_UP
+  GENERAL
+}
+
+// ──────────────────────────────────────────────
+// Auth Models (better-auth)
+// ──────────────────────────────────────────────
+
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
-  password      String?   // kept for backward compat; better-auth uses Account table
+  password      String?
   phoneNumber   String?
-  gender        Gender?
+  gender        String?
   birthday      DateTime?
   role          Role      @default(PATIENT)
   banned        Boolean?
@@ -48,10 +87,17 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  patientAppointments Appointment[] @relation("PatientAppointments")
-  doctorProfile       Doctor?
-  sessions            Session[]
-  accounts            Account[]
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  patientAppointments     Appointment[]            @relation("PatientAppointments")
+  doctorProfile           Doctor?
+  sessions                Session[]
+  accounts                Account[]
+  notificationPreferences NotificationPreference[]
+  consultationNotes       ConsultationNote[]       @relation("PatientNotes")
+
+  @@index([organizationId])
 }
 
 model Session {
@@ -99,50 +145,168 @@ model Verification {
   updatedAt  DateTime? @updatedAt
 }
 
-model Doctor {
-  id           String        @id @default(cuid())
-  specialty    String        
-  bio          String?
-  available    Boolean       @default(true)
-  startTime    String        @default("09:00")
-  endTime      String        @default("17:00")
-  
-  userId       String        @unique
-    user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+// ──────────────────────────────────────────────
+// Organization & Subscription
+// ──────────────────────────────────────────────
 
+model Organization {
+  id        String           @id @default(cuid())
+  name      String
+  type      OrganizationType @default(CLINIC)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  users        User[]
+  doctors      Doctor[]
+  locations    Location[]
+  subscription Subscription?
+}
+
+model Subscription {
+  id                      String             @id @default(cuid())
+  planTier                String             @default("STARTER")
+  status                  SubscriptionStatus @default(ACTIVE)
+  billingCycle            BillingCycle       @default(MONTHLY)
+  maxDoctors              Int                @default(5)
+  maxAppointmentsPerMonth Int                @default(200)
+  features                Json               @default("[]")
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  city      String?
+  state     String?
+  country   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  doctors      Doctor[]
   appointments Appointment[]
-  appointmentTypes AppointmentType[]
+
+  @@index([organizationId])
+}
+
+// ──────────────────────────────────────────────
+// Doctor & Appointments
+// ──────────────────────────────────────────────
+
+model Doctor {
+  id        String  @id @default(cuid())
+  specialty String
+  bio       String?
+  available Boolean @default(true)
+  startTime String  @default("09:00")
+  endTime   String  @default("17:00")
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+
+  appointments      Appointment[]
+  appointmentTypes  AppointmentType[]
+  consultationNotes ConsultationNote[]
+
+  @@index([organizationId])
+  @@index([locationId])
 }
 
 model AppointmentType {
-  id        String   @id @default(cuid())
-  name      String
-  duration  Int      // in minutes
-  price     Float?
-  doctorId  String
-  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+  id       String @id @default(cuid())
+  name     String
+  duration Int
+  price    Float?
+
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id])
+
   appointments Appointment[]
 }
 
 model Appointment {
-  id          String            @id @default(cuid())
-  dateTime    DateTime         
-  endTime     DateTime?        // Make optional initially to avoid migration issues with existing data, but ideally required
-  status      AppointmentStatus @default(PENDING)
-  reason      String?         
-  notes       String?          
-  
+  id       String            @id @default(cuid())
+  dateTime DateTime
+  endTime  DateTime?
+  status   AppointmentStatus @default(PENDING)
+  reason   String?
+  notes    String?
+
   appointmentTypeId String?
-  appointmentType AppointmentType? @relation(fields: [appointmentTypeId], references: [id])
+  appointmentType   AppointmentType? @relation(fields: [appointmentTypeId], references: [id])
 
+  patientId String
+  patient   User   @relation("PatientAppointments", fields: [patientId], references: [id])
 
-  patientId   String
-  patient     User              @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id])
 
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
 
-  doctorId    String
-  doctor      Doctor            @relation(fields: [doctorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  consultationNotes ConsultationNote[]
+
+  @@index([locationId])
+}
+
+// ──────────────────────────────────────────────
+// Notification Preferences
+// ──────────────────────────────────────────────
+
+model NotificationPreference {
+  id      String              @id @default(cuid())
+  channel NotificationChannel
+  enabled Boolean             @default(true)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, channel])
+  @@index([userId])
+}
+
+// ──────────────────────────────────────────────
+// Consultation Notes
+// ──────────────────────────────────────────────
+
+model ConsultationNote {
+  id             String       @id @default(cuid())
+  title          String
+  content        String
+  category       NoteCategory @default(GENERAL)
+  isConfidential Boolean      @default(false)
+
+  appointmentId  String
+  appointment    Appointment  @relation(fields: [appointmentId], references: [id])
+
+  doctorId       String
+  doctor         Doctor       @relation(fields: [doctorId], references: [id])
+
+  patientId      String
+  patient        User         @relation("PatientNotes", fields: [patientId], references: [id])
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([appointmentId])
+  @@index([patientId])
+  @@index([doctorId])
 }

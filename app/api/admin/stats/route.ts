@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { getPlatformMetrics } from '@/lib/analytics';
 
 export async function GET(req: NextRequest) {
     const session = await auth.api.getSession({ headers: req.headers });
@@ -23,7 +24,8 @@ export async function GET(req: NextRequest) {
             pendingAppointments,
             confirmedAppointments,
             completedAppointments,
-            cancelledAppointments
+            cancelledAppointments,
+            platformMetrics
         ] = await Promise.all([
             prisma.user.count(),
             prisma.user.count({ where: { role: 'DOCTOR' } }),
@@ -33,6 +35,7 @@ export async function GET(req: NextRequest) {
             prisma.appointment.count({ where: { status: 'CONFIRMED' } }),
             prisma.appointment.count({ where: { status: 'COMPLETED' } }),
             prisma.appointment.count({ where: { status: 'CANCELLED' } }),
+            getPlatformMetrics()
         ]);
 
         return NextResponse.json({
@@ -47,7 +50,8 @@ export async function GET(req: NextRequest) {
                 confirmed: confirmedAppointments,
                 completed: completedAppointments,
                 cancelled: cancelledAppointments,
-            }
+            },
+            platform: platformMetrics
         }, { status: 200 });
     } catch (error) {
         console.error('Error fetching admin stats:', error);

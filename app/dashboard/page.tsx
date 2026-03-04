@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FaCalendarAlt, FaUserMd, FaPlus, FaClock, FaCheckCircle, FaExclamationCircle, FaTimes } from "react-icons/fa";
+import { FaCalendarAlt, FaUserMd, FaPlus, FaClock, FaCheckCircle, FaExclamationCircle, FaTimes, FaFileMedical } from "react-icons/fa";
 import { authClient } from "@/lib/auth-client";
 
 interface Appointment {
@@ -129,6 +129,12 @@ export default function DashboardPage() {
             <p className="text-gray-400 mt-2">Manage your appointments and health records</p>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/dashboard/consultations">
+              <button className="flex items-center gap-2 bg-gray-900/60 hover:bg-gray-800 text-white px-6 py-3 rounded-full font-bold border border-gray-700 shadow-lg hover:shadow-gray-900 transition-all duration-300">
+                <FaFileMedical size={14} />
+                Notes
+              </button>
+            </Link>
             <Link href="/dashboard/history">
               <button className="flex items-center gap-2 bg-gray-900/60 hover:bg-gray-800 text-white px-6 py-3 rounded-full font-bold border border-gray-700 shadow-lg hover:shadow-gray-900 transition-all duration-300">
                 <FaCalendarAlt size={14} />

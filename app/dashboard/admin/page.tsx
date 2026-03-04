@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   FaUserMd,
   FaUserShield,
@@ -13,6 +14,7 @@ import {
   FaCheckCircle,
   FaSearch,
   FaUsers,
+  FaBuilding,
 } from "react-icons/fa";
 
 interface Doctor {
@@ -239,7 +241,7 @@ export default function AdminDashboardPage() {
         )}
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 flex-wrap">
           <button
             onClick={() => setActiveTab("doctors")}
             className={`px-6 py-2 rounded-full font-semibold transition-colors ${activeTab === "doctors"
@@ -258,6 +260,14 @@ export default function AdminDashboardPage() {
           >
             All Users
           </button>
+          <Link href="/dashboard/admin/organizations">
+            <button
+              className={`px-6 py-2 rounded-full font-semibold transition-colors bg-gray-800 text-gray-400 hover:bg-gray-700 flex items-center gap-2`}
+            >
+              <FaBuilding size={14} />
+              Organizations
+            </button>
+          </Link>
         </div>
 
         <div className="grid gap-8 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">

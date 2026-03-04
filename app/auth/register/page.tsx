@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaPhone, FaVenusMars, FaCalendarAlt } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaPhone, FaVenusMars, FaCalendarAlt, FaBuilding } from "react-icons/fa";
 import { authClient } from "@/lib/auth-client";
 
 export default function RegisterPage() {
@@ -11,11 +11,19 @@ export default function RegisterPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [phoneNumber, setPhoneNumber] = useState("");
-    const [gender, setGender] = useState("");
+    const [gender, setGender] = useState<"MALE" | "FEMALE" | "">("");
     const [birthday, setBirthday] = useState("");
+    const [registerAsOrg, setRegisterAsOrg] = useState(false);
+    const [organizationName, setOrganizationName] = useState("");
+    const [organizationType, setOrganizationType] = useState<"HOSPITAL" | "CLINIC" | "LABORATORY" | "PHARMACY" | "">("");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
+
+    const genderMap: Record<string, string> = {
+        MALE: "male",
+        FEMALE: "female",
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -23,6 +31,7 @@ export default function RegisterPage() {
         setIsLoading(true);
 
         try {
+            // First, create the user account
             const result = await authClient.signUp.email({
                 name,
                 email,
@@ -33,6 +42,49 @@ export default function RegisterPage() {
                 setError(result.error.message || "Registration failed");
                 setIsLoading(false);
                 return;
+            }
+
+            // Update user profile with additional fields
+            try {
+                const profileData: Record<string, string | null> = {};
+                if (phoneNumber) profileData.phoneNumber = phoneNumber;
+                if (gender && genderMap[gender]) profileData.gender = genderMap[gender];
+                if (birthday) profileData.birthday = new Date(birthday).toISOString();
+
+                if (Object.keys(profileData).length > 0) {
+                    await fetch("/api/user/profile", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(profileData),
+                    });
+                }
+            } catch (profileError) {
+                console.error("Profile update error:", profileError);
+                // Non-critical, continue
+            }
+
+            // If registering as organization, create it after user creation
+            if (registerAsOrg && organizationName && organizationType) {
+                try {
+                    const orgResponse = await fetch("/api/organizations", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name: organizationName,
+                            type: organizationType,
+                            planTier: "STARTER",
+                        }),
+                    });
+
+                    if (!orgResponse.ok) {
+                        const orgError = await orgResponse.json().catch(() => ({}));
+                        console.error("Organization creation failed:", orgError);
+                        // Continue anyway - user is created
+                    }
+                } catch (orgError) {
+                    console.error("Organization creation error:", orgError);
+                    // Continue - user account is still valid
+                }
             }
 
             router.push("/auth/login");
@@ -130,7 +182,7 @@ export default function RegisterPage() {
                             <select
                                 className={`${inputClass} appearance-none`}
                                 value={gender}
-                                onChange={(e) => setGender(e.target.value)}
+                                onChange={(e) => setGender(e.target.value as "MALE" | "FEMALE" | "")}
                             >
                                 <option value="" className="bg-gray-900 text-gray-500">Gender (optional)</option>
                                 <option value="MALE" className="bg-gray-900 text-white">Male</option>
@@ -154,6 +206,58 @@ export default function RegisterPage() {
                     </div>
 
                     {error && <div className="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded-lg border border-red-900/50">{error}</div>}
+
+                    {/* Organization Registration Toggle */}
+                    <div className="flex items-center gap-3 bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                        <input
+                            type="checkbox"
+                            id="registerAsOrg"
+                            checked={registerAsOrg}
+                            onChange={(e) => setRegisterAsOrg(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-600 focus:ring-offset-gray-800"
+                        />
+                        <label htmlFor="registerAsOrg" className="flex items-center gap-2 text-sm font-medium text-gray-300 cursor-pointer">
+                            <FaBuilding className="text-blue-400" />
+                            Register as Healthcare Organization
+                        </label>
+                    </div>
+
+                    {/* Organization Details */}
+                    {registerAsOrg && (
+                        <div className="space-y-4 bg-gray-800/30 p-4 rounded-lg border border-gray-700">
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                                    <FaBuilding />
+                                </div>
+                                <input
+                                    type="text"
+                                    required={registerAsOrg}
+                                    className={inputClass}
+                                    placeholder="Organization Name"
+                                    value={organizationName}
+                                    onChange={(e) => setOrganizationName(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                                    <FaBuilding />
+                                </div>
+                                <select
+                                    required={registerAsOrg}
+                                    className={`${inputClass} appearance-none`}
+                                    value={organizationType}
+                                    onChange={(e) => setOrganizationType(e.target.value as any)}
+                                >
+                                    <option value="" className="bg-gray-900 text-gray-500">Organization Type</option>
+                                    <option value="HOSPITAL" className="bg-gray-900 text-white">Hospital</option>
+                                    <option value="CLINIC" className="bg-gray-900 text-white">Clinic</option>
+                                    <option value="LABORATORY" className="bg-gray-900 text-white">Laboratory</option>
+                                    <option value="PHARMACY" className="bg-gray-900 text-white">Pharmacy</option>
+                                </select>
+                            </div>
+                        </div>
+                    )}
 
                     <div>
                         <button
