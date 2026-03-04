@@ -40,6 +40,8 @@ export default function LoginPage() {
                     router.push("/dashboard/doctor");
                 } else if (userRole === "ADMIN") {
                     router.push("/dashboard/admin");
+                } else if (userRole === "ORG_ADMIN") {
+                    router.push("/dashboard/organization");
                 } else {
                     router.push("/dashboard");
                 }

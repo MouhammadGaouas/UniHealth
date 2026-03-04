@@ -49,6 +49,11 @@ export default function DashboardPage() {
         router.push("/dashboard/admin");
         return;
       }
+      // Redirect organization admins to their organization dashboard
+      if (userRole === "ORG_ADMIN") {
+        router.push("/dashboard/organization");
+        return;
+      }
     } catch (error) {
       console.error("Failed to fetch user", error);
     }
