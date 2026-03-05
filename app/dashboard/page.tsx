@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FaCalendarAlt, FaUserMd, FaPlus, FaClock, FaCheckCircle, FaExclamationCircle, FaTimes, FaFileMedical } from "react-icons/fa";
+import { FaCalendarAlt, FaUserMd, FaPlus, FaClock, FaCheckCircle, FaExclamationCircle, FaTimes, FaFileMedical, FaUser, FaInfoCircle, FaHeartbeat } from "react-icons/fa";
 import { authClient } from "@/lib/auth-client";
 
 interface Appointment {
@@ -130,62 +130,122 @@ export default function DashboardPage() {
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 animate-[fadeIn_0.5s_ease-out]">
           <div>
-            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">My Dashboard</h1>
-            <p className="text-gray-400 mt-2">Manage your appointments and health records</p>
+            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+              Welcome back, {user?.name?.split(" ")[0] || "there"}!
+            </h1>
+            <p className="text-gray-400 mt-2">Manage your health records and appointments</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/consultations">
-              <button className="flex items-center gap-2 bg-gray-900/60 hover:bg-gray-800 text-white px-6 py-3 rounded-full font-bold border border-gray-700 shadow-lg hover:shadow-gray-900 transition-all duration-300">
-                <FaFileMedical size={14} />
-                Notes
-              </button>
-            </Link>
-            <Link href="/dashboard/history">
-              <button className="flex items-center gap-2 bg-gray-900/60 hover:bg-gray-800 text-white px-6 py-3 rounded-full font-bold border border-gray-700 shadow-lg hover:shadow-gray-900 transition-all duration-300">
-                <FaCalendarAlt size={14} />
-                History
-              </button>
-            </Link>
-            <Link href="/book">
-              <button className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white px-6 py-3 rounded-full font-bold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:scale-105 transition-all duration-300">
-                <FaPlus size={14} /> Book New Appointment
-              </button>
-            </Link>
+          <div className="flex items-center gap-3 bg-gray-900/60 border border-gray-800 rounded-full px-5 py-2 text-xs uppercase tracking-wide text-gray-400">
+            <FaUser size={14} className="text-blue-400" />
+            <span>Patient Portal</span>
           </div>
         </div>
 
-        {/* Upcoming Appointments */}
-        <div className="glass border border-gray-800 rounded-2xl p-8 shadow-xl animate-[slideUp_0.6s_ease-out] mb-8">
-          <h2 className="text-2xl font-bold text-white mb-8 border-b border-gray-800 pb-4">Upcoming Appointments</h2>
+        <div className="grid gap-8 lg:grid-cols-[1fr_1.5fr]">
+          {/* Left Column: Actions & Hub */}
+          <div className="space-y-6">
+            <div className="glass border border-gray-800 rounded-2xl p-6 shadow-xl animate-[slideUp_0.5s_ease-out]">
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <FaHeartbeat className="text-red-400" />
+                Quick Actions
+              </h2>
+              <div className="grid gap-3">
+                <Link href="/book" className="group flex items-center p-4 bg-gradient-to-r from-blue-900/40 to-cyan-900/20 border border-blue-800/50 rounded-xl hover:from-blue-600 hover:to-cyan-500 transition-all">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-300 group-hover:bg-white/20 group-hover:text-white transition">
+                    <FaPlus />
+                  </div>
+                  <div className="ml-4">
+                    <p className="font-bold text-white">Book Appointment</p>
+                    <p className="text-xs text-blue-200/70 group-hover:text-white/80 transition text-wrap pr-2">Schedule a new visit</p>
+                  </div>
+                </Link>
 
-          {upcomingAppointments.length === 0 ? (
-            <div className="text-center py-16 text-gray-500 bg-gray-900/30 rounded-xl border border-dashed border-gray-800">
-              <div className="w-20 h-20 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-600">
-                <FaCalendarAlt size={32} />
+                <Link href="/dashboard/history" className="group flex items-center p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800 transition-colors">
+                  <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 group-hover:text-white transition">
+                    <FaHistoryIcon />
+                  </div>
+                  <div className="ml-4">
+                    <p className="font-bold text-white">History</p>
+                    <p className="text-xs text-gray-500">View past appointments</p>
+                  </div>
+                </Link>
+
+                <Link href="/dashboard/consultations" className="group flex items-center p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800 transition-colors">
+                  <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 group-hover:text-white transition">
+                    <FaFileMedical />
+                  </div>
+                  <div className="ml-4">
+                    <p className="font-bold text-white">Consultation Notes</p>
+                    <p className="text-xs text-gray-500">Access doctors' feedback</p>
+                  </div>
+                </Link>
+
+                <Link href="/dashboard/profile" className="group flex items-center p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800 transition-colors">
+                  <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 group-hover:text-white transition">
+                    <FaUser />
+                  </div>
+                  <div className="ml-4">
+                    <p className="font-bold text-white">My Profile</p>
+                    <p className="text-xs text-gray-500">Update personal details</p>
+                  </div>
+                </Link>
               </div>
-              <p className="text-lg mb-2">You have no upcoming appointments.</p>
-              <Link href="/book" className="text-blue-500 hover:text-blue-400 hover:underline font-medium">
-                Schedule your first visit
-              </Link>
             </div>
-          ) : (
-            <div className="grid gap-6">
-              {upcomingAppointments.map((apt) => (
-                <AppointmentCard
-                  key={apt.id}
-                  appointment={apt}
-                  onCancel={handleCancelAppointment}
-                  isCancelling={cancellingId === apt.id}
-                />
-              ))}
+
+            <div className="glass border border-gray-800 rounded-2xl p-6 shadow-xl animate-[slideUp_0.6s_ease-out]">
+              <div className="flex items-start gap-4">
+                <FaInfoCircle className="text-gray-400 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-gray-300">Need Help?</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    If you have questions about your appointments or need Technical Assistance, please contact our support desk.
+                  </p>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
+
+          {/* Right Column: Upcoming Appointments */}
+          <div className="glass border border-gray-800 rounded-2xl p-8 shadow-xl animate-[slideUp_0.7s_ease-out] mb-8 h-fit">
+            <h2 className="text-2xl font-bold text-white mb-8 border-b border-gray-800 pb-4">Upcoming Appointments</h2>
+
+            {upcomingAppointments.length === 0 ? (
+              <div className="text-center py-16 text-gray-500 bg-gray-900/30 rounded-xl border border-dashed border-gray-800">
+                <div className="w-20 h-20 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-600">
+                  <FaCalendarAlt size={32} />
+                </div>
+                <p className="text-lg mb-2">You have no upcoming appointments.</p>
+                <Link href="/book" className="text-blue-500 hover:text-blue-400 hover:underline font-medium">
+                  Schedule your first visit
+                </Link>
+              </div>
+            ) : (
+              <div className="grid gap-6">
+                {upcomingAppointments.map((apt) => (
+                  <AppointmentCard
+                    key={apt.id}
+                    appointment={apt}
+                    onCancel={handleCancelAppointment}
+                    isCancelling={cancellingId === apt.id}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          {/* End of Grid */}
         </div>
-
-
       </div>
     </div>
   );
+}
+
+// Simple history icon wrapper
+function FaHistoryIcon() {
+  return (
+    <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+      <path d="M504 255.531c.253 136.64-111.18 248.372-247.82 248.468-59.015.042-113.223-20.53-155.822-54.671-5.704-4.576-6.195-13.116-1.077-18.234l34.428-34.428c4.017-4.017 10.435-4.481 14.93-1.057 32.748 24.932 73.911 39.814 118.298 39.814 105.8 0 191.737-85.836 191.737-191.684.053-100.999-78.079-183.856-177.307-191.139-4.819-54.606-25.753-106.31-59.817-148.971-4.831-6.042-14.153-6.521-19.638-1.036L4.01 101.996c-5.32 5.32-5.337 13.987-.04 19.324l198.053 199.309c5.446 5.48 14.64 5.093 19.559-.838 35.195-42.503 57.075-94.673 63.029-149.805 101.488 4.708 183.27 88.082 183.389 190.545zM172.502 112v-111c0-2-2.1-3.2-3.8-2l-108 73c-1.3.9-1.3 2.9 0 3.8l108 73c1.7 1.2 3.8 0 3.8-2z"></path>
+    </svg>
+  )
 }
 
 function AppointmentCard({
