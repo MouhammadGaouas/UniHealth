@@ -1,30 +1,23 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { NextResponse, NextRequest } from "next/server";
+import { withAuth, AuthenticatedRequest } from "@/lib/api-middleware";
 import { getSubscriptionUsage } from "@/lib/subscription-limits";
+import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+async function GET(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!req.user.organizationId) {
+            return NextResponse.json({ error: "No organization associated with user" }, { status: 400 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { organizationId: true }
-        });
+        // This relies on an existing robust utility function
+        const usage = await getSubscriptionUsage(req.user.organizationId);
 
-        if (!user?.organizationId) {
-            return NextResponse.json({ error: "No organization found" }, { status: 404 });
-        }
-
-        const usage = await getSubscriptionUsage(user.organizationId);
-
-        return NextResponse.json({ usage });
+        return NextResponse.json(usage);
     } catch (error) {
         console.error("Error fetching subscription usage:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
+export const GET_HANDLER = withAuth(GET);
+export { GET_HANDLER as GET };

@@ -1,24 +1,12 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse, NextRequest } from "next/server";
+import { doctorService } from "@/services/DoctorService";
 
-export async function GET() {
+export async function GET(_req: NextRequest) {
     try {
-        const doctors = await prisma.doctor.findMany({
-            where: {
-                available: true
-            },
-            include: {
-                user: {
-                    select: {
-                        name: true,
-                        email: true,
-                    }
-                }
-            }
-        });
+        const doctors = await doctorService.getAllDoctors();
         return NextResponse.json({ doctors }, { status: 200 });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error fetching doctors:", error);
-        return NextResponse.json({ message: "Error fetching doctors" }, { status: 500 });
+        return NextResponse.json({ error: "Error fetching doctors" }, { status: 500 });
     }
 }

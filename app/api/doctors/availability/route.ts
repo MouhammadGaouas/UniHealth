@@ -1,61 +1,23 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { startOfDay, endOfDay, parseISO } from 'date-fns';
+import { NextResponse, NextRequest } from "next/server";
+import { doctorService } from "@/services/DoctorService";
 
-export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const doctorId = searchParams.get('doctorId');
-    const dateParam = searchParams.get('date');
-
-    if (!doctorId || !dateParam) {
-        return NextResponse.json({ message: "Missing doctorId or date" }, { status: 400 });
-    }
-
+export async function GET(req: NextRequest) {
     try {
-        const date = parseISO(dateParam);
-        const start = startOfDay(date);
-        const end = endOfDay(date);
-
-        // Fetch doctor's working hours
-        const doctor = await prisma.doctor.findUnique({
-            where: { id: doctorId },
-            select: { startTime: true, endTime: true }
+        const { searchParams } = new URL(req.url);
+        const data = await doctorService.getAvailability({
+            doctorId: searchParams.get('doctorId') || "",
+            date: searchParams.get('date') || ""
         });
 
-        if (!doctor) {
-            return NextResponse.json({ message: "Doctor not found" }, { status: 404 });
+        return NextResponse.json(data, { status: 200 });
+    } catch (error: any) {
+        if (error.name === 'ZodError') {
+            return NextResponse.json({ error: error.errors }, { status: 400 });
         }
-
-        const appointments = await prisma.appointment.findMany({
-            where: {
-                doctorId: doctorId,
-                status: {
-                    not: 'CANCELLED'
-                },
-                dateTime: {
-                    gte: start,
-                    lte: end
-                }
-            },
-            select: {
-                dateTime: true,
-                endTime: true,
-            }
-        });
-
-        // If endTime is missing (legacy data), assume 30 mins
-        const bookedSlots = appointments.map(appt => ({
-            start: appt.dateTime.toISOString(),
-            end: (appt.endTime || new Date(appt.dateTime.getTime() + 30 * 60000)).toISOString()
-        }));
-
-        return NextResponse.json({
-            bookedSlots,
-            workDayStart: doctor?.startTime || "09:00",
-            workDayEnd: doctor?.endTime || "17:00"
-        }, { status: 200 });
-    } catch (error) {
+        if (error.message === "Doctor not found") {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
         console.error("Error fetching availability:", error);
-        return NextResponse.json({ message: "Error fetching availability" }, { status: 500 });
+        return NextResponse.json({ error: "Error fetching availability" }, { status: 500 });
     }
 }

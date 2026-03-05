@@ -1,56 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+import { appointmentService } from '@/services/AppointmentService';
+import { withRole, AuthenticatedRequest } from '@/lib/api-middleware';
+import { prisma } from '@/lib/prisma'; // Only needed to get doctor ID from user ID
 
-export async function GET(req: NextRequest) {
-  const session = await auth.api.getSession({ headers: req.headers });
-
-  if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  const user = session.user;
-
-  if ((user as Record<string, unknown>).role !== 'DOCTOR') {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-  }
-
+async function GET(req: AuthenticatedRequest) {
   try {
-    const doctor = await prisma.doctor.findUnique({
-      where: { userId: user.id },
-    });
-
+    const doctor = await prisma.doctor.findUnique({ where: { userId: req.user.id } });
     if (!doctor) {
-      return NextResponse.json(
-        { message: 'Doctor profile not found for this user' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Doctor profile not found for this user' }, { status: 404 });
     }
 
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        doctorId: doctor.id,
-        status: { in: ['PENDING', 'CONFIRMED'] },
-      },
-      include: {
-        patient: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        dateTime: 'asc',
-      },
-    });
-
+    const appointments = await appointmentService.getDoctorUpcomingAppointments(doctor.id);
     return NextResponse.json({ appointments }, { status: 200 });
-  } catch (error) {
-    console.error('Error fetching doctor appointments:', error);
-    return NextResponse.json(
-      { message: 'Error fetching doctor appointments' },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error("Error fetching doctor appointments:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export const GET_HANDLER = withRole(['DOCTOR'], GET);
+export { GET_HANDLER as GET };

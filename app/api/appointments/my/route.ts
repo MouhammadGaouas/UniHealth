@@ -1,38 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+import { appointmentService } from '@/services/AppointmentService';
+import { withAuth, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function GET(req: NextRequest) {
-    const session = await auth.api.getSession({ headers: req.headers });
-
-    if (!session) {
-        return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = session.user;
-
+async function GET(req: AuthenticatedRequest) {
     try {
-        const appointments = await prisma.appointment.findMany({
-            where: {
-                patientId: user.id
-            },
-            include: {
-                doctor: {
-                    include: {
-                        user: {
-                            select: { name: true }
-                        }
-                    }
-                }
-            },
-            orderBy: {
-                dateTime: 'desc'
-            }
-        });
-
+        const appointments = await appointmentService.getMyUpcomingAppointments(req.user.id);
         return NextResponse.json({ appointments }, { status: 200 });
-    } catch (error) {
-        console.error("Error fetching appointments:", error);
-        return NextResponse.json({ message: "Error fetching appointments" }, { status: 500 });
+    } catch (error: any) {
+        console.error("Error fetching patient appointments:", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
+export const GET_HANDLER = withAuth(GET);
+export { GET_HANDLER as GET };

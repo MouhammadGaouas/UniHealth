@@ -1,104 +1,40 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { NextResponse } from 'next/server';
+import { appointmentService } from '@/services/AppointmentService';
+import { withAuth, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
-    const params = await props.params;
-    const appointmentId = params.id;
-
-    const session = await auth.api.getSession({ headers: req.headers });
-    if (!session?.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+async function GET(req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const appointment = await prisma.appointment.findUnique({
-            where: { id: appointmentId },
-            select: { patientId: true, doctor: { select: { userId: true } } }
-        });
-
-        if (!appointment) {
-            return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
-        }
-
-        const isDoctor = appointment.doctor.userId === session.user.id;
-        const isPatient = appointment.patientId === session.user.id;
-
-        if (!isDoctor && !isPatient) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-
-        const notes = await prisma.consultationNote.findMany({
-            where: { appointmentId },
-            include: {
-                doctor: {
-                    include: { user: { select: { name: true } } }
-                }
-            },
-            orderBy: { createdAt: "desc" }
-        });
-
-        return NextResponse.json({ notes });
-    } catch (error) {
+        const { id } = await params;
+        const notes = await appointmentService.getNotes(id, req.user.id, req.user.role);
+        return NextResponse.json({ notes }, { status: 200 });
+    } catch (error: any) {
+        if (error.message.includes("not found")) return NextResponse.json({ error: error.message }, { status: 404 });
+        if (error.message.includes("Forbidden")) return NextResponse.json({ error: error.message }, { status: 403 });
         console.error("Error fetching notes:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
-export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
-    const params = await props.params;
-    const appointmentId = params.id;
-
-    const session = await auth.api.getSession({ headers: req.headers });
-    if (!session?.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+async function POST(req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const appointment = await prisma.appointment.findUnique({
-            where: { id: appointmentId },
-            include: { doctor: { select: { id: true, userId: true } } }
-        });
-
-        if (!appointment) {
-            return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+        // Only Doctors can create notes
+        if (req.user.role !== 'DOCTOR') {
+            return NextResponse.json({ error: "Forbidden: Only doctors can add notes" }, { status: 403 });
         }
 
-        if (appointment.doctor.userId !== session.user.id) {
-            return NextResponse.json({ error: "Only the assigned doctor can send notes" }, { status: 403 });
-        }
+        const { id } = await params;
+        const body = await req.json();
 
-        if (appointment.status !== "COMPLETED") {
-            return NextResponse.json({ error: "Notes can only be sent for completed appointments" }, { status: 400 });
-        }
-
-        const { title, content, category, isConfidential } = await req.json();
-
-        if (!title?.trim() || !content?.trim()) {
-            return NextResponse.json({ error: "Title and content are required" }, { status: 400 });
-        }
-
-        const validCategories = ["DIAGNOSIS", "PRESCRIPTION", "FOLLOW_UP", "GENERAL"];
-        const noteCategory = validCategories.includes(category) ? category : "GENERAL";
-
-        const note = await prisma.consultationNote.create({
-            data: {
-                title: title.trim(),
-                content: content.trim(),
-                category: noteCategory,
-                isConfidential: !!isConfidential,
-                appointmentId,
-                doctorId: appointment.doctor.id,
-                patientId: appointment.patientId
-            },
-            include: {
-                doctor: { include: { user: { select: { name: true } } } }
-            }
-        });
-
-        return NextResponse.json({ note }, { status: 201 });
-    } catch (error) {
-        console.error("Error creating note:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        const note = await appointmentService.createNote(id, req.user.id, body);
+        return NextResponse.json({ message: "Note added successfully", note }, { status: 201 });
+    } catch (error: any) {
+        if (error.name === 'ZodError') return NextResponse.json({ error: error.errors }, { status: 400 });
+        const message = error.message || "Internal server error";
+        const status = message.includes("Forbidden") ? 403 : message.includes("not found") ? 404 : 400;
+        return NextResponse.json({ error: message }, { status });
     }
 }
+
+export const GET_HANDLER = withAuth(GET);
+export const POST_HANDLER = withAuth(POST);
+export { GET_HANDLER as GET, POST_HANDLER as POST };

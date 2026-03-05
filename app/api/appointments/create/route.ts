@@ -1,126 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { prisma } from "@/lib/prisma";
-import { notificationService } from "@/lib/notifications";
-import { enforceAppointmentLimit } from "@/lib/subscription-limits";
+import { NextResponse } from 'next/server';
+import { appointmentService } from '@/services/AppointmentService';
+import { withRole, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function POST(req: NextRequest) {
+async function POST(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
-        const {
-            doctorId,
-            dateTime,
-            appointmentTypeId,
-            reason,
-            notes
-        } = await req.json();
-
-        if (!doctorId || !dateTime) {
-            return NextResponse.json({
-                error: "doctorId and dateTime are required"
-            }, { status: 400 });
-        }
-
-        const patientId = session.user.id;
-
-        // Get doctor's organization to enforce limits
-        const doctor = await prisma.doctor.findUnique({
-            where: { id: doctorId },
-            select: { organizationId: true }
-        });
-
-        if (!doctor?.organizationId) {
-            return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
-        }
-
-        // Enforce appointment limit
-        try {
-            await enforceAppointmentLimit(doctor.organizationId);
-        } catch (limitError: any) {
-            return NextResponse.json({ error: limitError.message }, { status: 403 });
-        }
-
-        // Check for scheduling conflicts
-        const existingAppointment = await prisma.appointment.findFirst({
-            where: {
-                doctorId,
-                dateTime: new Date(dateTime),
-                status: { in: ["PENDING", "CONFIRMED"] }
-            }
-        });
-
-        if (existingAppointment) {
-            return NextResponse.json({
-                error: "Time slot is already booked"
-            }, { status: 409 });
-        }
-
-        // Create the appointment
-        const appointment = await prisma.appointment.create({
-            data: {
-                doctorId,
-                patientId,
-                dateTime: new Date(dateTime),
-                appointmentTypeId: appointmentTypeId || null,
-                reason: reason || null,
-                notes: notes || null,
-                status: "PENDING"
-            },
-            include: {
-                patient: {
-                    select: {
-                        name: true,
-                        email: true,
-                        phoneNumber: true
-                    }
-                },
-                doctor: {
-                    include: {
-                        user: { select: { name: true } }
-                    }
-                },
-                location: { select: { name: true } },
-                appointmentType: { select: { name: true, duration: true } }
-            }
-        });
-
-        // Calculate end time if appointment type has duration
-        if (appointment.appointmentType?.duration) {
-            const endTime = new Date(appointment.dateTime.getTime() +
-                appointment.appointmentType.duration * 60000);
-            await prisma.appointment.update({
-                where: { id: appointment.id },
-                data: { endTime }
-            });
-        }
-
-        // Send confirmation notification
-        try {
-            await notificationService.sendAppointmentConfirmation({
-                appointmentId: appointment.id,
-                patientName: appointment.patient.name || "",
-                patientEmail: appointment.patient.email,
-                patientPhone: appointment.patient.phoneNumber || undefined,
-                doctorName: appointment.doctor.user.name || "Doctor",
-                dateTime: appointment.dateTime,
-                locationName: appointment.location?.name,
-                appointmentType: appointment.appointmentType?.name
-            });
-        } catch (notifError) {
-            console.error("Failed to send confirmation:", notifError);
-            // Don't fail the request if notification fails
-        }
-
+        const body = await req.json();
+        const appointment = await appointmentService.createAppointment(req.user.id, body);
         return NextResponse.json({ appointment }, { status: 201 });
-    } catch (error) {
-        console.error("Error creating appointment:", error);
-        return NextResponse.json({
-            error: "Internal server error"
-        }, { status: 500 });
+    } catch (error: any) {
+        if (error.name === 'ZodError') {
+            return NextResponse.json({ error: error.errors }, { status: 400 });
+        }
+        const message = error.message || "Internal server error";
+        const status = message.includes("not found") ? 404 :
+            message.includes("limit") || message.includes("available") ? 403 :
+                message.includes("conflicts") ? 409 : 400;
+
+        return NextResponse.json({ error: message }, { status });
     }
 }
+
+export const POST_HANDLER = withRole(['PATIENT', 'DOCTOR', 'ADMIN'], POST);
+export { POST_HANDLER as POST };

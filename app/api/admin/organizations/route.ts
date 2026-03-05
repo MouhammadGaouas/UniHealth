@@ -1,58 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { NextResponse } from 'next/server';
+import { adminService } from '@/services/AdminService';
+import { withRole, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function GET(req: NextRequest) {
+async function getOrgsHandler(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: req.headers });
-
-        if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-        }
-
-        if ((session.user as Record<string, unknown>).role !== "ADMIN") {
-            return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-
         const { searchParams } = new URL(req.url);
-        const search = searchParams.get("search") || "";
-        const type = searchParams.get("type") || "";
-
-        const organizations = await prisma.organization.findMany({
-            where: {
-                AND: [
-                    type ? { type: type as any } : {},
-                    search ? {
-                        name: { contains: search, mode: "insensitive" }
-                    } : {}
-                ]
-            },
-            include: {
-                subscription: {
-                    select: {
-                        planTier: true,
-                        status: true,
-                        maxDoctors: true,
-                        maxAppointmentsPerMonth: true,
-                    }
-                },
-                _count: {
-                    select: {
-                        doctors: true,
-                        locations: true,
-                    }
-                }
-            },
-            orderBy: { createdAt: "desc" },
-            take: 50,
+        const organizations = await adminService.getOrganizations({
+            type: searchParams.get('type') as any || undefined,
+            search: searchParams.get('search') || undefined,
         });
-
         return NextResponse.json({ organizations }, { status: 200 });
-    } catch (error) {
-        console.error("Error fetching organizations:", error);
-        return NextResponse.json(
-            { message: "Error fetching organizations" },
-            { status: 500 }
-        );
+    } catch (error: any) {
+        if (error.name === 'ZodError') {
+            return NextResponse.json({ error: error.errors }, { status: 400 });
+        }
+        return NextResponse.json({ error: 'Error fetching organizations' }, { status: 500 });
     }
 }
+
+export const GET = withRole(['ADMIN'], getOrgsHandler);

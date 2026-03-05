@@ -1,54 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+import { appointmentService } from '@/services/AppointmentService';
+import { withAuth, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function GET(req: NextRequest) {
-    const session = await auth.api.getSession({ headers: req.headers });
-
-    if (!session) {
-        return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = session.user;
-
-    const { searchParams } = new URL(req.url);
-    const statusFilter = searchParams.get('status'); // COMPLETED, CANCELLED, or null for all
-
+async function GET(req: AuthenticatedRequest) {
     try {
-        const now = new Date();
+        const { searchParams } = new URL(req.url);
+        const queryParams = Object.fromEntries(searchParams.entries());
 
-        const appointments = await prisma.appointment.findMany({
-            where: {
-                patientId: user.id,
-                OR: [
-                    { status: 'COMPLETED' },
-                    { status: 'CANCELLED' },
-                    { dateTime: { lt: now } },
-                ],
-                ...(statusFilter && ['COMPLETED', 'CANCELLED'].includes(statusFilter)
-                    ? { status: statusFilter as 'COMPLETED' | 'CANCELLED' }
-                    : {}),
-            },
-            include: {
-                doctor: {
-                    include: {
-                        user: {
-                            select: { name: true }
-                        }
-                    }
-                },
-                appointmentType: {
-                    select: { name: true, duration: true }
-                }
-            },
-            orderBy: {
-                dateTime: 'desc'
-            }
-        });
-
+        const appointments = await appointmentService.getHistory(req.user.id, "PATIENT", queryParams);
         return NextResponse.json({ appointments }, { status: 200 });
-    } catch (error) {
+    } catch (error: any) {
+        if (error.name === 'ZodError') {
+            return NextResponse.json({ error: error.errors }, { status: 400 });
+        }
         console.error("Error fetching appointment history:", error);
-        return NextResponse.json({ message: "Error fetching appointment history" }, { status: 500 });
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
+export const GET_HANDLER = withAuth(GET);
+export { GET_HANDLER as GET };

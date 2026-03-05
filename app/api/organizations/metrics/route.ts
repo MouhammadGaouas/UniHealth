@@ -1,35 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { getOrganizationMetrics } from "@/lib/analytics";
-import { headers } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { organizationService } from '@/services/OrganizationService';
+import { withRole, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function GET(req: NextRequest) {
+async function GET(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!req.user.organizationId) {
+            return NextResponse.json({ error: "No organization associated with user" }, { status: 400 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { organizationId: true, role: true }
-        });
-
-        if (!user?.organizationId) {
-            return NextResponse.json({ error: "No organization found" }, { status: 404 });
-        }
-
-        // Only org admins and system admins can access metrics
-        if (user.role !== "ORG_ADMIN" && user.role !== "ADMIN" && user.role !== "DOCTOR") {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-
-        const metrics = await getOrganizationMetrics(user.organizationId);
-
-        return NextResponse.json({ metrics });
-    } catch (error) {
+        const metrics = await organizationService.getMetrics(req.user.organizationId);
+        return NextResponse.json(metrics, { status: 200 });
+    } catch (error: any) {
         console.error("Error fetching organization metrics:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ error: "Error fetching metrics" }, { status: 500 });
     }
 }
+
+export const GET_HANDLER = withRole(['ORG_ADMIN', 'ADMIN'], GET);
+export { GET_HANDLER as GET };

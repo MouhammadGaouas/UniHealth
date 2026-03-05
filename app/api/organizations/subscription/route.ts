@@ -1,35 +1,22 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { NextResponse, NextRequest } from "next/server";
+import { organizationService } from "@/services/OrganizationService";
+import { withAuth, AuthenticatedRequest } from "@/lib/api-middleware";
 
-export async function GET() {
+async function GET(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!req.user.organizationId) {
+            return NextResponse.json({ error: "No organization associated with user" }, { status: 400 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { organizationId: true }
-        });
+        const org = await organizationService.getByUserId(req.user.id);
+        const activeSubscription = org?.subscription || null;
 
-        if (!user?.organizationId) {
-            return NextResponse.json({ error: "No organization found" }, { status: 404 });
-        }
-
-        const subscription = await prisma.subscription.findFirst({
-            where: { organizationId: user.organizationId }
-        });
-
-        if (!subscription) {
-            return NextResponse.json({ error: "No subscription found" }, { status: 404 });
-        }
-
-        return NextResponse.json({ subscription });
+        return NextResponse.json({ subscription: activeSubscription });
     } catch (error) {
         console.error("Error fetching subscription:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
+export const GET_HANDLER = withAuth(GET);
+export { GET_HANDLER as GET };

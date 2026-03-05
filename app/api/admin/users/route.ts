@@ -1,52 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+import { adminService } from '@/services/AdminService';
+import { withRole, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function GET(req: NextRequest) {
-    const session = await auth.api.getSession({ headers: req.headers });
-
-    if (!session) {
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
-
-    if ((session.user as Record<string, unknown>).role !== 'ADMIN') {
-        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-    }
-
+async function getUsersHandler(req: AuthenticatedRequest) {
     try {
         const { searchParams } = new URL(req.url);
-        const search = searchParams.get('search') || '';
-        const role = searchParams.get('role') || '';
-
-        const users = await prisma.user.findMany({
-            where: {
-                AND: [
-                    role ? { role: role as 'PATIENT' | 'DOCTOR' | 'ADMIN' } : {},
-                    search ? {
-                        OR: [
-                            { name: { contains: search, mode: 'insensitive' } },
-                            { email: { contains: search, mode: 'insensitive' } }
-                        ]
-                    } : {}
-                ]
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-                createdAt: true,
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 50,
+        const users = await adminService.getUsers({
+            role: searchParams.get('role') as any || undefined,
+            search: searchParams.get('search') || undefined,
         });
-
         return NextResponse.json({ users }, { status: 200 });
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        return NextResponse.json(
-            { message: 'Error fetching users' },
-            { status: 500 }
-        );
+    } catch (error: any) {
+        if (error.name === 'ZodError') {
+            return NextResponse.json({ error: error.errors }, { status: 400 });
+        }
+        return NextResponse.json({ error: 'Error fetching users' }, { status: 500 });
     }
 }
+
+export const GET = withRole(['ADMIN'], getUsersHandler);

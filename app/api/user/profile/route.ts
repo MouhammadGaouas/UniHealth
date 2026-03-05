@@ -1,71 +1,43 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { userService } from '@/services/UserService';
+import { withAuth, AuthenticatedRequest } from '@/lib/api-middleware';
+import { prisma } from '@/lib/prisma'; // Only needed for a generic GET
 
-export async function PUT(req: NextRequest) {
+async function GET(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: req.headers });
-
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
-        const { phoneNumber, gender, birthday, name } = await req.json();
-
-        const updateData: Record<string, string | null | Date> = {};
-        if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber || null;
-        if (gender !== undefined) updateData.gender = gender || null;
-        if (birthday !== undefined) updateData.birthday = birthday ? new Date(birthday) : null;
-        if (name !== undefined) updateData.name = name || null;
-
-        const updatedUser = await prisma.user.update({
-            where: { id: session.user.id },
-            data: updateData,
+        const userProfile = await prisma.user.findUnique({
+            where: { id: req.user.id },
             select: {
-                id: true,
-                name: true,
-                email: true,
-                phoneNumber: true,
-                gender: true,
-                birthday: true,
-                role: true,
-            },
+                id: true, name: true, email: true, emailVerified: true,
+                role: true, phoneNumber: true, gender: true, birthday: true,
+                createdAt: true
+            }
         });
 
-        return NextResponse.json({ user: updatedUser });
+        if (!userProfile) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
+
+        return NextResponse.json({ user: userProfile });
     } catch (error) {
-        console.error("Error updating profile:", error);
+        console.error("Profile GET Error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
-export async function GET(req: NextRequest) {
+async function PUT(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: req.headers });
-
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const body = await req.json();
+        const updatedUser = await userService.updateProfile(req.user.id, body);
+        return NextResponse.json({ message: "Profile updated successfully", user: updatedUser });
+    } catch (error: any) {
+        if (error.name === 'ZodError') {
+            return NextResponse.json({ error: error.errors }, { status: 400 });
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                phoneNumber: true,
-                gender: true,
-                birthday: true,
-                role: true,
-                image: true,
-                emailVerified: true,
-                createdAt: true,
-            },
-        });
-
-        return NextResponse.json({ user });
-    } catch (error) {
-        console.error("Error fetching profile:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ error: error.message || "Internal server error" }, { status: error.message?.includes("not found") ? 404 : 500 });
     }
 }
+
+export const GET_HANDLER = withAuth(GET);
+export const PUT_HANDLER = withAuth(PUT);
+export { GET_HANDLER as GET, PUT_HANDLER as PUT };

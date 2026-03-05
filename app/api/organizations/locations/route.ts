@@ -1,126 +1,68 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { enforceLocationLimit } from "@/lib/subscription-limits";
+import { NextResponse } from 'next/server';
+import { organizationService } from '@/services/OrganizationService';
+import { withRole, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function GET() {
+async function GET(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!req.user.organizationId) {
+            return NextResponse.json({ error: "No organization associated with user" }, { status: 400 });
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { organizationId: true }
-        });
-
-        if (!user?.organizationId) {
-            return NextResponse.json({ error: "No organization found" }, { status: 404 });
-        }
-
-        const locations = await prisma.location.findMany({
-            where: { organizationId: user.organizationId },
-            include: {
-                _count: { select: { doctors: true, appointments: true } }
-            },
-            orderBy: { name: "asc" }
-        });
-
-        return NextResponse.json({ locations });
-    } catch (error) {
+        const locations = await organizationService.getLocations(req.user.organizationId);
+        return NextResponse.json({ locations }, { status: 200 });
+    } catch (error: any) {
         console.error("Error fetching locations:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
-export async function POST(req: NextRequest) {
+async function POST(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!req.user.organizationId) {
+            return NextResponse.json({ error: "No organization associated with user" }, { status: 400 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { organizationId: true, role: true }
-        });
+        const body = await req.json();
+        const location = await organizationService.addLocation(req.user.organizationId, body);
 
-        if (!user?.organizationId || (user.role !== "ORG_ADMIN" && user.role !== "ADMIN")) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        return NextResponse.json({ message: "Location created successfully", location }, { status: 201 });
+    } catch (error: any) {
+        if (error.name === 'ZodError') {
+            return NextResponse.json({ error: error.errors }, { status: 400 });
         }
-
-        const { name, address, city, state, country, phone } = await req.json();
-
-        if (!name || !address) {
-            return NextResponse.json({ error: "Name and address are required" }, { status: 400 });
-        }
-
-        // Enforce subscription location limit
-        try {
-            await enforceLocationLimit(user.organizationId);
-        } catch (limitError: any) {
-            return NextResponse.json({ error: limitError.message }, { status: 403 });
-        }
-
-        const location = await prisma.location.create({
-            data: {
-                name,
-                address,
-                city: city || null,
-                state: state || null,
-                country: country || null,
-                phone: phone || null,
-                organizationId: user.organizationId
-            }
-        });
-
-        return NextResponse.json({ location }, { status: 201 });
-    } catch (error) {
         console.error("Error creating location:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ error: error.message || "Internal server error" }, { status: error.message?.includes("limit reached") ? 403 : 500 });
     }
 }
 
-export async function DELETE(req: NextRequest) {
+async function DELETE(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!req.user.organizationId) {
+            return NextResponse.json({ error: "No organization associated with user" }, { status: 400 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { organizationId: true, role: true }
-        });
+        const { searchParams } = new URL(req.url);
+        const locationId = searchParams.get('locationId');
 
-        if (!user?.organizationId || (user.role !== "ORG_ADMIN" && user.role !== "ADMIN")) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-
-        const { locationId } = await req.json();
         if (!locationId) {
-            return NextResponse.json({ error: "locationId is required" }, { status: 400 });
+            return NextResponse.json({ error: "Missing locationId" }, { status: 400 });
         }
 
-        const location = await prisma.location.findUnique({
-            where: { id: locationId },
-            select: { organizationId: true }
-        });
+        await organizationService.deactivateLocation(req.user.organizationId, locationId);
 
-        if (!location || location.organizationId !== user.organizationId) {
-            return NextResponse.json({ error: "Location not found in your organization" }, { status: 404 });
+        return NextResponse.json({ message: "Location deactivated successfully" }, { status: 200 });
+    } catch (error: any) {
+        if (error.message.includes("not found")) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
         }
-
-        await prisma.location.update({
-            where: { id: locationId },
-            data: { isActive: false }
-        });
-
-        return NextResponse.json({ message: "Location deactivated" });
-    } catch (error) {
+        if (error.message.includes("Cannot deactivate")) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+        }
         console.error("Error deactivating location:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
+export const GET_HANDLER = withRole(['ORG_ADMIN', 'ADMIN'], GET);
+export const POST_HANDLER = withRole(['ORG_ADMIN', 'ADMIN'], POST);
+export const DELETE_HANDLER = withRole(['ORG_ADMIN', 'ADMIN'], DELETE);
+export { GET_HANDLER as GET, POST_HANDLER as POST, DELETE_HANDLER as DELETE };

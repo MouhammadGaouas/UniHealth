@@ -1,115 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+import { appointmentService } from '@/services/AppointmentService';
+import { withAuth, AuthenticatedRequest } from '@/lib/api-middleware';
 
-const ALLOWED_STATUSES = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'] as const;
-type AllowedStatus = (typeof ALLOWED_STATUSES)[number];
-
-export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
-  const appointmentId = params.id;
-  const session = await auth.api.getSession({ headers: req.headers });
-
-  if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  const user = session.user;
-  const userRole = (user as Record<string, unknown>).role as string;
-
-  if (!appointmentId) {
-    return NextResponse.json(
-      { message: 'Invalid appointment id in URL' },
-      { status: 400 }
-    );
-  }
-
+async function PATCH(req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { status } = (await req.json()) as { status?: string };
+    const { id } = await params;
 
-    if (!status || !ALLOWED_STATUSES.includes(status as AllowedStatus)) {
-      return NextResponse.json(
-        { message: 'Invalid or missing status' },
-        { status: 400 }
-      );
+    // Status can be updated by PATIENT, DOCTOR, or ORG_ADMIN
+    if (!['PATIENT', 'DOCTOR', 'ORG_ADMIN'].includes(req.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Fetch the appointment to verify ownership
-    const appointment = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
-      include: {
-        doctor: {
-          select: { userId: true }
-        }
-      },
-    });
+    const body = await req.json();
+    const appointment = await appointmentService.updateStatus(req.user.id, req.user.role, id, body);
 
-    if (!appointment) {
-      return NextResponse.json(
-        { message: 'Appointment not found' },
-        { status: 404 }
-      );
+    return NextResponse.json({ message: 'Status updated successfully', appointment }, { status: 200 });
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return NextResponse.json({ error: error.errors }, { status: 400 });
     }
+    const message = error.message || "Internal server error";
+    const status = message.includes("Forbidden") ? 403 :
+      message.includes("not found") ? 404 : 400;
 
-    // Authorization logic based on user role
-    if (userRole === 'DOCTOR') {
-      if (appointment.doctor.userId !== user.id) {
-        return NextResponse.json(
-          { message: 'Appointment not found for this doctor' },
-          { status: 404 }
-        );
-      }
-    } else if (userRole === 'PATIENT') {
-      if (appointment.patientId !== user.id) {
-        return NextResponse.json(
-          { message: 'Appointment not found' },
-          { status: 404 }
-        );
-      }
-      if (status !== 'CANCELLED') {
-        return NextResponse.json(
-          { message: 'Patients can only cancel appointments' },
-          { status: 403 }
-        );
-      }
-      if (appointment.status === 'COMPLETED' || appointment.status === 'CANCELLED') {
-        return NextResponse.json(
-          { message: `Cannot cancel an appointment that is already ${appointment.status.toLowerCase()}` },
-          { status: 400 }
-        );
-      }
-    } else if (userRole === 'ADMIN') {
-      // Admins can update any appointment status
-    } else {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-    }
-
-    const updated = await prisma.appointment.update({
-      where: { id: appointmentId },
-      data: { status: status as AllowedStatus },
-      include: {
-        patient: {
-          select: { name: true, email: true },
-        },
-        doctor: {
-          include: {
-            user: {
-              select: { name: true }
-            }
-          }
-        }
-      },
-    });
-
-    return NextResponse.json(
-      { message: 'Status updated successfully', appointment: updated },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error('Error updating appointment status:', error);
-    return NextResponse.json(
-      { message: 'Error updating appointment status' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status });
   }
 }
+
+export const PATCH_HANDLER = withAuth(PATCH);
+export { PATCH_HANDLER as PATCH };

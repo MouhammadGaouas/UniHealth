@@ -1,76 +1,23 @@
-import { NextResponse, NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { NextResponse } from 'next/server';
+import { adminService } from '@/services/AdminService';
+import { withRole, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function POST(req: NextRequest) {
+async function makeDoctorHandler(req: AuthenticatedRequest) {
   try {
-    const session = await auth.api.getSession({ headers: req.headers });
-
-    if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    if ((session.user as Record<string, unknown>).role !== "ADMIN") {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-    }
-
-    const { userId, specialty } = await req.json();
-
-    if (!userId || !specialty) {
-      return NextResponse.json(
-        { message: "userId and specialty are required" },
-        { status: 400 },
-      );
-    }
-
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
-    }
-
-    // Check if user is already a doctor
-    if (user.role === "DOCTOR") {
-      return NextResponse.json(
-        { message: "User is already a doctor" },
-        { status: 400 },
-      );
-    }
-
-    // Update user role and create doctor profile in a transaction
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: userId },
-        data: { role: "DOCTOR" },
-      }),
-      prisma.doctor.create({
-        data: {
-          userId,
-          specialty,
-          available: true,
-          appointmentTypes: {
-            create: [
-              { name: "Quick Consultation", duration: 15, price: 0 },
-              { name: "Follow-up", duration: 30, price: 0 },
-              { name: "First Visit", duration: 45, price: 0 }
-            ]
-          }
-        },
-      }),
-    ]);
-
+    const body = await req.json();
+    const doctor = await adminService.promoteUserToDoctor(body);
     return NextResponse.json(
-      { message: "User promoted to Doctor and default appointment types created" },
-      { status: 200 },
+      { message: "User promoted to Doctor and default appointment types created", doctor },
+      { status: 200 }
     );
-  } catch (error) {
-    console.error("Error promoting user to doctor:", error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500 },
-    );
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return NextResponse.json({ error: error.errors }, { status: 400 });
+    }
+    const message = error.message || "Internal server error";
+    const status = message.includes("not found") ? 404 : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 }
+
+export const POST = withRole(['ADMIN'], makeDoctorHandler);

@@ -13,6 +13,10 @@ export async function GET() {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        if ((session.user as Record<string, unknown>).role !== 'DOCTOR') {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         const doctor = await prisma.doctor.findUnique({
             where: { userId: session.user.id },
             include: {
@@ -39,7 +43,7 @@ export async function GET() {
             return NextResponse.json({ error: "Doctor profile not found" }, { status: 404 });
         }
 
-        return NextResponse.json({ 
+        return NextResponse.json({
             location: doctor.location,
             organization: doctor.organization
         });
@@ -57,6 +61,10 @@ export async function POST(req: NextRequest) {
         const session = await auth.api.getSession({ headers: await headers() });
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        if ((session.user as Record<string, unknown>).role !== 'DOCTOR') {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         const doctor = await prisma.doctor.findUnique({
@@ -92,15 +100,15 @@ export async function POST(req: NextRequest) {
         });
 
         if (existingAssociation) {
-            return NextResponse.json({ 
-                error: "Already associated with this location" 
+            return NextResponse.json({
+                error: "Already associated with this location"
             }, { status: 400 });
         }
 
         // Add location to doctor's practice locations
         // Note: This creates a many-to-many relationship through a join table
         // For now, we'll update the doctor's primary location and track associations separately
-        
+
         await prisma.doctor.update({
             where: { id: doctor.id },
             data: {
@@ -109,9 +117,9 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        return NextResponse.json({ 
+        return NextResponse.json({
             message: "Location added to practice",
-            locationId 
+            locationId
         });
     } catch (error) {
         console.error("Error adding practice location:", error);
@@ -127,6 +135,10 @@ export async function DELETE(req: NextRequest) {
         const session = await auth.api.getSession({ headers: await headers() });
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        if ((session.user as Record<string, unknown>).role !== 'DOCTOR') {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         const doctor = await prisma.doctor.findUnique({
@@ -151,8 +163,8 @@ export async function DELETE(req: NextRequest) {
             }
         });
 
-        return NextResponse.json({ 
-            message: "Location removed from practice" 
+        return NextResponse.json({
+            message: "Location removed from practice"
         });
     } catch (error) {
         console.error("Error removing practice location:", error);

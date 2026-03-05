@@ -1,82 +1,48 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { NextResponse } from 'next/server';
+import { organizationService } from '@/services/OrganizationService';
+import { withRole, AuthenticatedRequest } from '@/lib/api-middleware';
 
-export async function GET() {
+async function GET(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!req.user.organizationId) {
+            return NextResponse.json({ error: "No organization associated with user" }, { status: 400 });
         }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { organizationId: true, role: true }
-        });
-
-        if (!user?.organizationId) {
-            return NextResponse.json({ error: "No organization found" }, { status: 404 });
-        }
-
-        if (user.role !== "ORG_ADMIN" && user.role !== "ADMIN") {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-
-        const doctors = await prisma.doctor.findMany({
-            where: { organizationId: user.organizationId },
-            include: {
-                user: { select: { id: true, name: true, email: true } },
-                location: { select: { id: true, name: true } }
-            },
-            orderBy: { user: { name: "asc" } }
-        });
-
-        return NextResponse.json({ doctors });
-    } catch (error) {
+        const team = await organizationService.getTeam(req.user.organizationId);
+        return NextResponse.json({ team });
+    } catch (error: any) {
         console.error("Error fetching team:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
-export async function DELETE(req: NextRequest) {
+async function DELETE(req: AuthenticatedRequest) {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!req.user.organizationId) {
+            return NextResponse.json({ error: "No organization associated with user" }, { status: 400 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { organizationId: true, role: true }
-        });
+        const { searchParams } = new URL(req.url);
+        const doctorId = searchParams.get('doctorId');
 
-        if (!user?.organizationId || (user.role !== "ORG_ADMIN" && user.role !== "ADMIN")) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-
-        const { doctorId } = await req.json();
         if (!doctorId) {
-            return NextResponse.json({ error: "doctorId is required" }, { status: 400 });
+            return NextResponse.json({ error: "Missing doctorId" }, { status: 400 });
         }
 
-        const doctor = await prisma.doctor.findUnique({
-            where: { id: doctorId },
-            select: { organizationId: true, userId: true }
-        });
+        await organizationService.removeDoctor(req.user.organizationId, doctorId);
 
-        if (!doctor || doctor.organizationId !== user.organizationId) {
-            return NextResponse.json({ error: "Doctor not found in your organization" }, { status: 404 });
+        return NextResponse.json({ message: "Doctor removed from organization successfully" });
+    } catch (error: any) {
+        if (error.message.includes("not found")) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
         }
-
-        await prisma.doctor.update({
-            where: { id: doctorId },
-            data: { organizationId: null, locationId: null }
-        });
-
-        return NextResponse.json({ message: "Doctor removed from organization" });
-    } catch (error) {
-        console.error("Error removing team member:", error);
+        if (error.message.includes("Cannot remove")) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        console.error("Error removing doctor:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
+export const GET_HANDLER = withRole(['ORG_ADMIN', 'ADMIN'], GET);
+export const DELETE_HANDLER = withRole(['ORG_ADMIN', 'ADMIN'], DELETE);
+export { GET_HANDLER as GET, DELETE_HANDLER as DELETE };
